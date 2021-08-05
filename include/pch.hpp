@@ -3,10 +3,15 @@
 
 #include <iostream>
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <dwmapi.h>
+#include <unknwn.h>
+//#include <gdiplus.h>
+#include <windowsx.h>
 
-#include "asio.h"
 
-
+#include <vector>
 
 
 

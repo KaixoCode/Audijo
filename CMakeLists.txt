@@ -46,6 +46,8 @@ target_include_directories(${PRJ_NAME} PUBLIC
 
 target_link_libraries(${PRJ_NAME}
   ${ASIOSDK_LIBRARIES}
+  winmm 
+  ole32
 )
 
 # Group source according to folder layout

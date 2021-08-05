@@ -1,6 +1,12 @@
 #include "Audijo.hpp"
 
+
+#include <thread>
+#include <chrono>
 int main()
 {
-	Audijo a;
+	using namespace Kaixo;
+
+
+	Audijo asio;
 }
