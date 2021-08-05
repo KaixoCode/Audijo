@@ -7,24 +7,44 @@ set(SRC "${${PRJ_NAME}_SOURCE_DIR}/")
 # Main library linking and including
 project (${PRJ_NAME})
 
-# We require some sdks
-FIND_PACKAGE(ASIOSDK)
-
 file(GLOB_RECURSE SOURCE
   "${SRC}source/*.cpp"
   "${SRC}include/*.hpp"
 )
 
+set(INCLUDE_DIRS
+  ${SRC}include/
+)
+
+option(AUDIJO_USE_ASIO "Build ASIO API" ON)
+
+if(AUDIJO_USE_ASIO)
+# We require some sdks
+FIND_PACKAGE(ASIOSDK REQUIRED)
+
+list(APPEND INCLUDE_DIRS
+  ${ASIOSDK_ROOT_DIR}/common/
+  ${ASIOSDK_ROOT_DIR}/host/
+  ${ASIOSDK_ROOT_DIR}/host/pc/
+)
+
+list(APPEND SOURCE
+  ${ASIOSDK_ROOT_DIR}/common/asio.cpp
+  ${ASIOSDK_ROOT_DIR}/host/asiodrivers.cpp
+  ${ASIOSDK_ROOT_DIR}/host/pc/asiolist.cpp
+)
+endif()
+
+message("${INCLUDE_DIRS}")
+
 # Add the library
 add_library(${PRJ_NAME} STATIC ${SOURCE})
 
 target_include_directories(${PRJ_NAME} PUBLIC
-  ${SRC}include/
-  ${ASIOSDK_INCLUDE_DIR}
+  ${INCLUDE_DIRS}
 )
 
-# Link to SDKs
-target_link_libraries(${PRJ_NAME} 
+target_link_libraries(${PRJ_NAME}
   ${ASIOSDK_LIBRARIES}
 )
 
