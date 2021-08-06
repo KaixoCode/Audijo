@@ -37,8 +37,7 @@ Audijo()
 
 namespace Audijo
 {
-	template<typename InFormat, typename OutFormat, typename UserData>
-	using Callback = int(*)(InFormat, OutFormat, UserData&);
+
 
 	enum Api 
 	{
@@ -74,10 +73,10 @@ namespace Audijo
 		 * back into its original form. The userdata will be moved to the type-erased object as a void*
 		 * and when requested to call, will be casted to the correct type inside the type-erased object.
 		 */
-		template<typename InFormat, typename OutFormat, typename UserData>
-		void SetCallback(Callback<InFormat, OutFormat, UserData> callback) 
+		template<typename InFormat, typename OutFormat, typename ...UserData>
+		void SetCallback(Callback<InFormat, OutFormat, UserData...> callback) 
 		{
-
+			m_Api->SetCallback(std::make_unique<CallbackWrapper<InFormat, OutFormat, UserData...>>(callback));
 		};
 
 		/**

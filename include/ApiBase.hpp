@@ -3,6 +3,31 @@
 
 namespace Audijo 
 {
+	template<typename InFormat, typename OutFormat, typename ...UserData>
+	using Callback = int(*)(InFormat*, OutFormat*, UserData...);
+
+	class CallbackWrapperBase
+	{
+		virtual int Call(void* in, void* out, void* userdata) = 0;
+	};
+
+	template<typename InFormat, typename OutFormat, typename ...UserData>
+	class CallbackWrapper : public CallbackWrapperBase
+	{
+	public:
+		CallbackWrapper(Callback<InFormat, OutFormat, UserData...> callback)
+			: m_Callback(callback)
+		{}
+
+		int Call(void* in, void* out, void* userdata) override
+		{
+			return m_Callback(static_cast<InFormat*>(in), static_cast<OutFormat*>(out), *static_cast<UserData*>(userdata)...);
+		}
+
+	private:
+		Callback<InFormat, OutFormat, UserData...> m_Callback;
+	};
+
 	enum SampleFormat 
 	{
 		Int32,
@@ -68,8 +93,15 @@ namespace Audijo
 		 * Does nothing if the stream hasn't been opened yet.
 		 */
 		virtual void CloseStream() = 0;
-	
+
+		/**
+		 * Set the callback.
+		 * @param 
+		 */
+		void SetCallback(std::unique_ptr<CallbackWrapperBase>&& callback) { m_Callback = std::move(callback); }
+
 	protected:
+		std::unique_ptr<CallbackWrapperBase> m_Callback;
 		static inline std::vector<DeviceInfo> m_Devices;
 	};
 }

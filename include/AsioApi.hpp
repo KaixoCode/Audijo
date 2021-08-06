@@ -39,6 +39,10 @@ static const char* getAsioErrorString(ASIOError result)
 
 namespace Audijo
 {
+
+
+
+
 	class AsioApi : public ApiBase
 	{
 	public:
