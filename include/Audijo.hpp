@@ -76,7 +76,7 @@ Audijo()
  * 
  */
 
-namespace Kaixo
+namespace Audijo
 {
 	struct DriverInfo
 	{
@@ -86,29 +86,35 @@ namespace Kaixo
 
 	std::vector<DriverInfo> m_Drivers;
 
-	struct StreamBase
+
+	enum Api 
 	{
-		
+		UNSPECIFIED, ASIO, WASAPI
 	};
 
+	template<Api api = UNSPECIFIED>
+	struct Stream;
 
-	struct ApiBase
+	Stream()->Stream<UNSPECIFIED>;
+
+	template<>
+	struct Stream<UNSPECIFIED> 
+	{
+		Stream(Api api = ASIO)
+		{}
+	};
+
+	template<>
+	struct Stream<WASAPI>
 	{
 
 	};
 
-	struct Asio : public ApiBase
+	template<>
+	struct Stream<ASIO>
 	{
 
 	};
 
-	struct Audijo
-	{
-		Audijo() {}
-
-
-
-		std::unique_ptr<ApiBase> m_Api;
-	};
 }
 
