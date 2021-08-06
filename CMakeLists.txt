@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.0)
 set(PRJ_NAME "Audijo")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
-set (CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 20)
 set(SRC "${${PRJ_NAME}_SOURCE_DIR}/")
 
 # Main library linking and including
@@ -16,6 +16,7 @@ set(INCLUDE_DIRS
   ${SRC}include/
 )
 
+option(AUDIJO_BUILD_EXAMPLE "Build Example" ON)
 option(AUDIJO_USE_ASIO "Build ASIO API" ON)
 
 if(AUDIJO_USE_ASIO)
@@ -55,6 +56,7 @@ source_group(TREE ${SRC} FILES ${SOURCE})
 target_precompile_headers(${PRJ_NAME} PUBLIC "${SRC}include/pch.hpp")
 
 # Example project
+if(AUDIJO_BUILD_EXAMPLE)
 set(EXM_NAME "AudijoExample")
 project (${EXM_NAME})
 set(EXM_SRC "${${EXM_NAME}_SOURCE_DIR}/")
@@ -63,4 +65,4 @@ add_executable(${EXM_NAME} ${EXAMPLE_SOURCE})
 target_include_directories(${EXM_NAME} PUBLIC "${SRC}include/")
 target_link_libraries(${EXM_NAME} ${PRJ_NAME})
 source_group(TREE ${EXM_SRC} FILES ${EXAMPLE_SOURCE})
-
+endif()
