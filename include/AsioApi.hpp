@@ -54,7 +54,7 @@ namespace Audijo
 				// drivers.asioOpenDriver(i, (void**)&theAsioDriver);
 				// TODO: get all the information here using 'theAsioDriver'
 				// - all allowed sample rates of the device (look up often used samplerates and test those.
-				// - all allowed buffer sizes (granularity means stepsize between buffersizes, you'll know when you need this information lol)
+				// - all allowed buffer sizes (granularity means stepsize between buffersizes, you'll know when you need this information lol, if this is -1 it means it only supports a power of 2.)
 				// - the amount of input and output channels.
 
 				m_Devices.push_back({ i, name });
@@ -75,6 +75,8 @@ namespace Audijo
 			// setup all other settings
 
 			// 
+			
+			
 		}
 
 		void StartStream() override {};
