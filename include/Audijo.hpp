@@ -6,11 +6,6 @@
 #include "iasiodrv.h"
 #include "asiodrivers.h"
 
-
-static AsioDrivers drivers;
-static ASIODriverInfo driverInfo;
-extern IASIO* theAsioDriver;
-
 static const char* getAsioErrorString(ASIOError result)
 {
 	struct Messages
