@@ -1,35 +1,7 @@
 #pragma once
 #include "pch.hpp"
-#include "asiosys.h"
-#include "asio.h"
-#define interface struct
-#include "iasiodrv.h"
-#include "asiodrivers.h"
-
-static const char* getAsioErrorString(ASIOError result)
-{
-	struct Messages
-	{
-		ASIOError value;
-		const char* message;
-	};
-
-	static const Messages m[] =
-	{
-	  {   ASE_NotPresent,    "Hardware input or output is not present or available." },
-	  {   ASE_HWMalfunction,  "Hardware is malfunctioning." },
-	  {   ASE_InvalidParameter, "Invalid input parameter." },
-	  {   ASE_InvalidMode,      "Invalid mode." },
-	  {   ASE_SPNotAdvancing,     "Sample position not advancing." },
-	  {   ASE_NoClock,            "Sample clock or rate cannot be determined or is not present." },
-	  {   ASE_NoMemory,           "Not enough memory to complete the request." }
-	};
-
-	for (unsigned int i = 0; i < sizeof(m) / sizeof(m[0]); ++i)
-		if (m[i].value == result) return m[i].message;
-
-	return "Unknown error.";
-}
+#include "ApiBase.hpp"
+#include "AsioApi.hpp"
 
 /*
 Audijo()
@@ -62,26 +34,9 @@ Audijo()
 }
 */
 
-/*
- * Options for opening a stream:
- *  - A stream base class that you extend, with a callback
- *  - Simply a struct of device information, and then call an 
- *    OpenStream method with that info and a pointer to a callback function
- *  
- * 
- */
 
 namespace Audijo
 {
-	struct DriverInfo
-	{
-		unsigned int id;
-		std::string name;
-	};
-
-	std::vector<DriverInfo> m_Drivers;
-
-
 	enum Api 
 	{
 		UNSPECIFIED, ASIO, WASAPI
@@ -92,7 +47,21 @@ namespace Audijo
 
 	Stream(Api)->Stream<UNSPECIFIED>;
 
-	struct StreamBase { StreamBase(Api api) {} };
+	struct StreamBase 
+	{ 
+		StreamBase(Api api = ASIO) 
+		{
+			switch (api) {
+			case ASIO: m_Api = std::make_unique<AsioApi>(); break;
+			default:
+				throw std::exception("Incompatible api");
+			}
+		}
+
+		const std::vector<DeviceInfo>& Devices() { return m_Api->Devices(); }
+
+		std::unique_ptr<ApiBase> m_Api;
+	};
 
 	template<>
 	struct Stream<UNSPECIFIED> : public StreamBase

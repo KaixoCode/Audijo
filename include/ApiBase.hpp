@@ -5,23 +5,25 @@ namespace Audijo
 {
 	struct DeviceInfo 
 	{
-		const int id;
+		const unsigned int id;
 		const std::string name;
+	};
 
-		DeviceInfo(int id, std::string name) : id(id), name(name) 
-		{
-
-		}
+	struct Parameters 
+	{
+		unsigned int deviceId;
+		unsigned int channelAmount;
 	};
 
 	class ApiBase 
 	{
 	protected:
-		static std::vector<DeviceInfo> m_Devices;
+		static inline std::vector<DeviceInfo> m_Devices;
 	public:
-		virtual void OpenStream(DeviceInfo& inputDevice, DeviceInfo& outputDevice, unsigned int bufferSize, unsigned int channels) = 0;
-		virtual void StartStream() = 0;
-		virtual void StopStream() = 0;
-		virtual void CloseStream() = 0;
+		virtual void OpenStream(Parameters& in, Parameters& out, unsigned int bufferSize, double sampleRate) {};
+		virtual void StartStream() {};
+		virtual void StopStream() {};
+		virtual void CloseStream() {};
+		virtual const std::vector<DeviceInfo>& Devices() = 0;
 	};
 }
