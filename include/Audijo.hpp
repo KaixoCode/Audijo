@@ -97,23 +97,30 @@ namespace Audijo
 
 	Stream(Api)->Stream<UNSPECIFIED>;
 
+	struct StreamBase { StreamBase(Api api) {} };
+
 	template<>
-	struct Stream<UNSPECIFIED> 
+	struct Stream<UNSPECIFIED> : public StreamBase
 	{
 		Stream(Api api = ASIO)
+			: StreamBase(api)
 		{}
 	};
 
 	template<>
-	struct Stream<WASAPI>
+	struct Stream<WASAPI> : public StreamBase
 	{
-
+		Stream()
+			: StreamBase(WASAPI)
+		{}
 	};
 
 	template<>
-	struct Stream<ASIO>
+	struct Stream<ASIO> : public StreamBase
 	{
-
+		Stream()
+			: StreamBase(ASIO)
+		{}
 	};
 
 }
