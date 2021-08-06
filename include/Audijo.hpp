@@ -68,7 +68,12 @@ namespace Audijo
 		 */
 		const std::vector<DeviceInfo>& Devices() { return m_Api->Devices(); }
 
-
+		/**
+		 * Callback will be moved to a type-erased wrapper inside the ApiBase, where it will be invoked
+		 * on request of the Api, and using the selected formats the callback will then be type-casted
+		 * back into its original form. The userdata will be moved to the type-erased object as a void*
+		 * and when requested to call, will be casted to the correct type inside the type-erased object.
+		 */
 		template<typename InFormat, typename OutFormat, typename UserData>
 		void SetCallback(Callback<InFormat, OutFormat, UserData> callback) 
 		{
