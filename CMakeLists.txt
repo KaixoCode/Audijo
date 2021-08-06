@@ -35,8 +35,6 @@ list(APPEND SOURCE
 )
 endif()
 
-message("${INCLUDE_DIRS}")
-
 # Add the library
 add_library(${PRJ_NAME} STATIC ${SOURCE})
 

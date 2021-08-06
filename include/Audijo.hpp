@@ -95,7 +95,7 @@ namespace Audijo
 	template<Api api = UNSPECIFIED>
 	struct Stream;
 
-	Stream()->Stream<UNSPECIFIED>;
+	Stream(Api)->Stream<UNSPECIFIED>;
 
 	template<>
 	struct Stream<UNSPECIFIED> 

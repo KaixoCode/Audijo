@@ -5,10 +5,10 @@
 #include <chrono>
 using namespace Audijo;
 
-struct MyStream : public Stream<ASIO>
+struct MyStream : public Stream<>
 {
 	MyStream()
-		: Stream()
+		: Stream(ASIO)
 	{}
 };
 
