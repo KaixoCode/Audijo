@@ -16,6 +16,7 @@ set(INCLUDE_DIRS
   ${SRC}include/
 )
 
+option(AUDIJO_BUILD_DOCS "Build Docs" OFF)
 option(AUDIJO_BUILD_EXAMPLE "Build Example" ON)
 option(AUDIJO_USE_ASIO "Build ASIO API" ON)
 
@@ -65,4 +66,8 @@ add_executable(${EXM_NAME} ${EXAMPLE_SOURCE})
 target_include_directories(${EXM_NAME} PUBLIC "${SRC}include/")
 target_link_libraries(${EXM_NAME} ${PRJ_NAME})
 source_group(TREE ${EXM_SRC} FILES ${EXAMPLE_SOURCE})
+endif()
+
+if(AUDIJO_BUILD_DOCS)
+add_subdirectory("docs")
 endif()
