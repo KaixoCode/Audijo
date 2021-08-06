@@ -37,8 +37,8 @@ Audijo()
 
 namespace Audijo
 {
-
-	using Callback = int();
+	template<typename InFormat, typename OutFormat, typename UserData>
+	using Callback = int(*)(InFormat, OutFormat, UserData&);
 
 	enum Api 
 	{
@@ -67,6 +67,13 @@ namespace Audijo
 		 * @return all available devices given the chosen api.
 		 */
 		const std::vector<DeviceInfo>& Devices() { return m_Api->Devices(); }
+
+
+		template<typename InFormat, typename OutFormat, typename UserData>
+		void SetCallback(Callback<InFormat, OutFormat, UserData> callback) 
+		{
+
+		};
 
 		/**
 		 * Open the stream.
