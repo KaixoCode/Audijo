@@ -37,55 +37,88 @@ Audijo()
 
 namespace Audijo
 {
+
+	using Callback = int();
+
 	enum Api 
 	{
-		UNSPECIFIED, ASIO, WASAPI
+		Unspecified, Asio, Wasapi
 	};
 
-	template<Api api = UNSPECIFIED>
-	struct Stream;
-
-	Stream(Api)->Stream<UNSPECIFIED>;
-
-	struct StreamBase 
-	{ 
-		StreamBase(Api api = ASIO) 
+	template<Api api = Unspecified>
+	class Stream 
+	{
+	public:
+		/**
+		 * Constructor
+		 * @param api audio api
+		 */
+		Stream(Api api)
 		{
-			switch (api) {
-			case ASIO: m_Api = std::make_unique<AsioApi>(); break;
-			default:
-				throw std::exception("Incompatible api");
+			switch (api)
+			{
+			case Asio: m_Api = std::make_unique<AsioApi>(); break;
+			default: throw std::exception("Incompatible api");
 			}
 		}
 
+		/**
+		 * Search for all available devices.
+		 * @return all available devices given the chosen api.
+		 */
 		const std::vector<DeviceInfo>& Devices() { return m_Api->Devices(); }
 
+		/**
+		 * Open the stream.
+		 * @param settings StreamSettings
+		 */
+		void OpenStream(const StreamSettings& settings = StreamSettings{}) { m_Api->OpenStream(settings); };
+
+		/**
+		 * Starts the flow of audio through the opened stream. Does nothing
+		 * if the stream has not been opened yet.
+		 */
+		void StartStream() { m_Api->StartStream(); };
+
+		/**
+		 * Stop the flow of audio through the stream. Does nothing if the
+		 * stream hasn't been started or opened yet.
+		 */
+		void StopStream() { m_Api->StopStream(); };
+
+		/**
+		 * Close the stream. Also stops the stream if it hasn't been stopped yet.
+		 * Does nothing if the stream hasn't been opened yet.
+		 */
+		void CloseStream() { m_Api->CloseStream(); };
+
+	protected:
 		std::unique_ptr<ApiBase> m_Api;
 	};
 
 	template<>
-	struct Stream<UNSPECIFIED> : public StreamBase
+	class Stream<Wasapi> : public Stream<>
 	{
-		Stream(Api api = ASIO)
-			: StreamBase(api)
+	public:
+		Stream()
+			: Stream<>(Wasapi)
 		{}
 	};
 
 	template<>
-	struct Stream<WASAPI> : public StreamBase
+	class Stream<Asio> : public Stream<>
 	{
+	public:
 		Stream()
-			: StreamBase(WASAPI)
+			: Stream<>(Asio)
 		{}
+
+		/**
+		 * TODO: Opens the ASIO control panel.
+		 */
+		void OpenControlPanel() {}
 	};
 
-	template<>
-	struct Stream<ASIO> : public StreamBase
-	{
-		Stream()
-			: StreamBase(ASIO)
-		{}
-	};
-
+	Stream(Api)->Stream<Unspecified>;
 }
 

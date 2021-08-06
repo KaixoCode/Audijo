@@ -39,20 +39,46 @@ static const char* getAsioErrorString(ASIOError result)
 
 namespace Audijo
 {
-	class AsioApi : public ApiBase 
+	class AsioApi : public ApiBase
 	{
 	public:
 		const std::vector<DeviceInfo>& Devices() override
 		{
 			drivers.removeCurrentDriver();
-			for (unsigned int i = 0; i < drivers.asioGetNumDev(); i++)
+			for (int i = 0; i < drivers.asioGetNumDev(); i++)
 			{
 				char name[50];
 				drivers.asioGetDriverName(i, name, 50);
 				
+				// To get access to 'theAsioDriver' you must use
+				// drivers.asioOpenDriver(i, (void**)&theAsioDriver);
+				// TODO: get all the information here using 'theAsioDriver'
+				// - all allowed sample rates of the device (look up often used samplerates and test those.
+				// - all allowed buffer sizes (granularity means stepsize between buffersizes, you'll know when you need this information lol)
+				// - the amount of input and output channels.
+
 				m_Devices.push_back({ i, name });
 			}
 			return m_Devices;
 		}
+
+		void OpenStream(const StreamSettings& settings = StreamSettings{}) override
+		{
+			// TODO: 
+
+			// get device/driver id from settings
+
+			// open the driver
+
+			// initialize asio with theAsioDriver
+
+			// setup all other settings
+
+			// 
+		}
+
+		void StartStream() override {};
+		void StopStream() override {};
+		void CloseStream() override {};
 	};
 }
