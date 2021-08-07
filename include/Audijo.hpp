@@ -73,10 +73,17 @@ namespace Audijo
 		 * back into its original form. The userdata will be moved to the type-erased object as a void*
 		 * and when requested to call, will be casted to the correct type inside the type-erased object.
 		 */
-		template<typename InFormat, typename OutFormat, typename ...UserData>
-		void SetCallback(Callback<InFormat, OutFormat, UserData...> callback) 
+		template<typename ...Args>
+		requires ValidCallback<int, Args...>
+		void SetCallback(Callback<Args...> callback)
 		{
-			m_Api->SetCallback(std::make_unique<CallbackWrapper<InFormat, OutFormat, UserData...>>(callback));
+			m_Api->SetCallback(std::make_unique<CallbackWrapper<Callback<Args...>, int(Args...)>>(callback));
+		};
+
+		template<typename Lambda> requires LambdaConstraint<Lambda>
+		void SetCallback(Lambda callback)
+		{
+			m_Api->SetCallback(std::make_unique<CallbackWrapper<Lambda, typename LambdaSignature<Lambda>::type>>(callback));
 		};
 
 		/**
@@ -103,7 +110,7 @@ namespace Audijo
 		 */
 		void CloseStream() { m_Api->CloseStream(); };
 
-	protected:
+	//protected:
 		std::unique_ptr<ApiBase> m_Api;
 	};
 
