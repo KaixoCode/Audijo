@@ -34,7 +34,7 @@ namespace Audijo
 	template<typename Ret, typename InFormat, typename OutFormat, typename ...UserData>
 	concept ValidCallback = std::is_same_v<Ret, int> && // Return must be int
 		ValidFormat<InFormat> && ValidFormat<OutFormat> // First 2 must be valid formats
-		&& sizeof...(UserData) <= 1 && (std::is_reference_v<UserData> && ...); // userdata is optional, must be reference
+		&& sizeof...(UserData) <= 1 && ((std::is_reference_v<UserData> && ...) || (std::is_pointer_v<UserData> && ...)); // userdata is optional, must be reference or pointer
 
 	// Signature check for lambdas
 	template<typename T>
@@ -75,10 +75,16 @@ namespace Audijo
 		int Call(void* in, void* out, void* userdata) override
 		{
 			if constexpr (sizeof...(Args) == 3)
-				return m_Callback(
-					reinterpret_cast<NthTypeOf<0, Args...>>(in),
-					reinterpret_cast<NthTypeOf<1, Args...>>(out),
-					*reinterpret_cast<std::remove_reference_t<NthTypeOf<2, Args...>>*>(out));
+				if constexpr (std::is_reference_v<NthTypeOf<2, Args...>>)
+					return m_Callback(
+						reinterpret_cast<NthTypeOf<0, Args...>>(in),
+						reinterpret_cast<NthTypeOf<1, Args...>>(out),
+						*reinterpret_cast<std::remove_reference_t<NthTypeOf<2, Args...>>*>(out));
+				else 
+					return m_Callback(
+						reinterpret_cast<NthTypeOf<0, Args...>>(in),
+						reinterpret_cast<NthTypeOf<1, Args...>>(out),
+						reinterpret_cast<NthTypeOf<2, Args...>>(out));
 			else 
 				return m_Callback(
 					reinterpret_cast<NthTypeOf<0, Args...>>(in),

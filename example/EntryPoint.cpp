@@ -10,6 +10,9 @@ int main()
 		return 0;
 	});
 
+	_stream.OpenStream();
+	_stream.StartStream();
+
 	float a = 1;
 	double va = 2;
 	_stream.m_Api->m_Callback->Call(&a, &a, &va);
