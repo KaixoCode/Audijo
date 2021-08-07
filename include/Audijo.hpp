@@ -3,42 +3,8 @@
 #include "ApiBase.hpp"
 #include "AsioApi.hpp"
 
-/*
-Audijo()
-{
-	drivers.removeCurrentDriver();
-	for (int i = 0; i < drivers.asioGetNumDev(); i++)
-	{
-		DriverInfo& info = m_Drivers.emplace_back();
-		char* name = new char[50];
-		drivers.asioGetDriverName(i, name, 50);
-		info.name = name;
-		info.id = i;
-		delete name;
-		LOGL(info.name);
-	}
-	drivers.asioOpenDriver(m_Drivers[0].id, (void**)&theAsioDriver);
-
-	driverInfo.asioVersion = 2;
-	driverInfo.sysRef = GetForegroundWindow();
-
-	ASIOError result = ASIOInit(&driverInfo);
-	if (result != ASE_OK) {
-		LOGL(" error (" << getAsioErrorString(result) << ") stopping device.");
-	}
-	LOGL("" << driverInfo.asioVersion);
-	LOGL("" << driverInfo.driverVersion);
-	LOGL("" << driverInfo.errorMessage);
-	LOGL("" << driverInfo.name);
-	LOGL("" << driverInfo.sysRef);
-}
-*/
-
-
 namespace Audijo
 {
-
-
 	enum Api 
 	{
 		Unspecified, Asio, Wasapi
@@ -73,8 +39,7 @@ namespace Audijo
 		 * back into its original form. The userdata will be moved to the type-erased object as a void*
 		 * and when requested to call, will be casted to the correct type inside the type-erased object.
 		 */
-		template<typename ...Args>
-		requires ValidCallback<int, Args...>
+		template<typename ...Args> requires ValidCallback<int, Args...>
 		void SetCallback(Callback<Args...> callback)
 		{
 			m_Api->SetCallback(std::make_unique<CallbackWrapper<Callback<Args...>, int(Args...)>>(callback));

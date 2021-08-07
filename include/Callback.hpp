@@ -32,9 +32,10 @@ namespace Audijo
 
 	// Valid callback signature
 	template<typename Ret, typename InFormat, typename OutFormat, typename ...UserData>
-	concept ValidCallback = std::is_same_v<Ret, int> && // Return must be int
-		ValidFormat<InFormat> && ValidFormat<OutFormat> // First 2 must be valid formats
-		&& sizeof...(UserData) <= 1 && ((std::is_reference_v<UserData> && ...) || (std::is_pointer_v<UserData> && ...)); // userdata is optional, must be reference or pointer
+	concept ValidCallback = std::is_same_v<Ret, int>       // Return must be int
+		&& ValidFormat<InFormat> && ValidFormat<OutFormat> // First 2 must be valid formats
+		&& sizeof...(UserData) <= 1 && ((std::is_reference_v<UserData> && ...) 
+			|| (std::is_pointer_v<UserData> && ...));      // userdata is optional, must be reference or pointer
 
 	// Signature check for lambdas
 	template<typename T>
@@ -63,8 +64,7 @@ namespace Audijo
 	 * Typed callback wrapper, implements pure virtual Call method and casts data back to
 	 * original type.
 	 */
-	template<typename Type, typename ...Args>
-	requires ValidCallback<int, Args...>
+	template<typename Type, typename ...Args> requires ValidCallback<int, Args...>
 	class CallbackWrapper<Type, int(Args...)> : public CallbackWrapperBase
 	{
 	public:

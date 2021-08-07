@@ -77,7 +77,7 @@ namespace Audijo
 		void SetCallback(std::unique_ptr<CallbackWrapperBase>&& callback) { m_Callback = std::move(callback); }
 
 	//protected:
-		std::unique_ptr<CallbackWrapperBase> m_Callback;
 		static inline std::vector<DeviceInfo> m_Devices;
+		std::unique_ptr<CallbackWrapperBase> m_Callback;
 	};
 }
