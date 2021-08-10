@@ -48,20 +48,18 @@ namespace Audijo
 	public:
 		const std::vector<DeviceInfo>& Devices() override
 		{
-			drivers.removeCurrentDriver();
 			for (int i = 0; i < drivers.asioGetNumDev(); i++)
 			{
 				char name[50];
 				drivers.asioGetDriverName(i, name, 50);
-				
-				// To get access to 'theAsioDriver' you must use
-				// drivers.asioOpenDriver(i, (void**)&theAsioDriver);
-				// TODO: get all the information here using 'theAsioDriver'
-				// - all allowed sample rates of the device (look up often used samplerates and test those.
-				// - all allowed buffer sizes (granularity means stepsize between buffersizes, you'll know when you need this information lol, if this is -1 it means it only supports a power of 2.)
-				// - the amount of input and output channels.
-
-				m_Devices.push_back({ i, name });
+				std::vector<double> srates;
+				drivers.asioOpenDriver(i, (void**)&theAsioDriver);
+				for (auto& srate : m_SampleRates)
+					if (theAsioDriver->canSampleRate(srate)) srates.push_back(srate);
+				long in, out;
+				theAsioDriver->getChannels(&in, &out);
+				m_Devices.push_back(DeviceInfo{ i, name, in, out, srates });
+				drivers.removeCurrentDriver();
 			}
 			return m_Devices;
 		}
@@ -70,8 +68,22 @@ namespace Audijo
 		{
 			// TODO: 
 
-			// get device/driver id from settings
-
+			int inid = settings.input.deviceId;
+			int outid = settings.output.deviceId;
+			drivers.asioOpenDriver(inid, (void**)&theAsioDriver);
+			ASIOBufferInfo info;
+			info.isInput = true;
+			info.channelNum = inid;
+			ASIOCallbacks cbacks;
+			auto error = theAsioDriver->createBuffers(&info, settings.input.channels, settings.bufferSize, &cbacks);
+			if (error != ASE_OK)
+			{
+				LOGL(getAsioErrorString(error));
+				LOGL("No");
+				return;
+			}
+			theAsioDriver->init(GetForegroundWindow());
+			theAsioDriver->start();
 			// open the driver
 
 			// initialize asio with theAsioDriver

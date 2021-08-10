@@ -18,7 +18,6 @@ namespace Audijo
 		const int inputChannels;
 		const int outputChannels;
 		const std::vector<double> sampleRates;
-		const std::vector<int> bufferSizes;
 	};
 
 	struct Parameters 
@@ -78,6 +77,7 @@ namespace Audijo
 
 	//protected:
 		static inline std::vector<DeviceInfo> m_Devices;
+		static inline double m_SampleRates[]{ 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 8000, 11025, 16000, 22050 };
 		std::unique_ptr<CallbackWrapperBase> m_Callback;
 	};
 }
