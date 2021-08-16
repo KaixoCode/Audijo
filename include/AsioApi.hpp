@@ -7,6 +7,7 @@
 #define interface struct
 #include "iasiodrv.h"
 #include "asiodrivers.h"
+#include <cassert>
 
 static AsioDrivers drivers;
 static ASIODriverInfo driverInfo;
@@ -66,37 +67,74 @@ namespace Audijo
 
 		void OpenStream(const StreamSettings& settings = StreamSettings{}) override
 		{
-			// TODO: 
+			// For an ASIO the input and output device need to be the same.
+			assert(settings.input.deviceId == settings.output.deviceId);
 
-			int inid = settings.input.deviceId;
-			int outid = settings.output.deviceId;
-			drivers.asioOpenDriver(inid, (void**)&theAsioDriver);
-			ASIOBufferInfo info;
-			info.isInput = true;
-			info.channelNum = inid;
-			ASIOCallbacks cbacks;
-			auto error = theAsioDriver->createBuffers(&info, settings.input.channels, settings.bufferSize, &cbacks);
+			// Retrieve necessary settings;
+			int _deviceId = settings.input.deviceId;
+			int _nInChannels = settings.input.channels;
+			int _nOutChannels = settings.output.channels;
+			int _nChannels = _nInChannels + _nOutChannels;
+			int _bufferSize = settings.bufferSize;
+			
+			// Open the driver
+			drivers.asioOpenDriver(_deviceId, (void**)&theAsioDriver);
+
+			// Init the ASIO
+			driverInfo.asioVersion = 2;
+			driverInfo.sysRef = GetForegroundWindow();
+			auto error = ASIOInit(&driverInfo);
 			if (error != ASE_OK)
 			{
 				LOGL(getAsioErrorString(error));
 				LOGL("No");
 				return;
 			}
-			theAsioDriver->init(GetForegroundWindow());
-			theAsioDriver->start();
-			// open the driver
 
-			// initialize asio with theAsioDriver
-
-			// setup all other settings
-
-			// 
-			
-			
+			// Create the buffer
+			if (m_BufferInfos)
+				delete m_BufferInfos;
+			m_BufferInfos = new ASIOBufferInfo[_nChannels];
+			for (int i = 0; i < _nInChannels; i++)
+				m_BufferInfos[i].isInput = true, 
+				m_BufferInfos[i].channelNum = i;
+			for (int i = _nInChannels; i < _nChannels; i++)
+				m_BufferInfos[i].isInput = false, 
+				m_BufferInfos[i].channelNum = i - _nInChannels;
+			error = ASIOCreateBuffers(m_BufferInfos, _nChannels, _bufferSize, &m_Callbacks);
+			if (error != ASE_OK)
+			{
+				LOGL(getAsioErrorString(error));
+				LOGL("No");
+				return;
+			}
 		}
 
-		void StartStream() override {};
-		void StopStream() override {};
+		void StartStream() override { ASIOStart(); };
+		void StopStream() override { ASIOStop(); };
 		void CloseStream() override {};
+
+	protected:
+		ASIOCallbacks m_Callbacks{ m_BufferSwitch, m_SampleRateDidChange, m_AsioMessage, m_BufferSwitchTimeInfo, };
+		ASIOBufferInfo* m_BufferInfos = nullptr;
+
+		static void m_BufferSwitch(long doubleBufferIndex, ASIOBool directProcess) 
+		{
+			
+		};
+
+		static void m_SampleRateDidChange(ASIOSampleRate sRate)
+		{
+		};
+
+		static long m_AsioMessage(long selector, long value, void* message, double* opt)
+		{ 
+			return 0; 
+		};
+
+		static ASIOTime* m_BufferSwitchTimeInfo (ASIOTime* params, long doubleBufferIndex, ASIOBool directProcess)
+		{
+			return params;
+		}
 	};
 }
