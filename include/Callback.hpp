@@ -3,6 +3,14 @@
 
 namespace Audijo
 {
+	struct CallbackInfo
+	{
+		int inputChannels;
+		int outputChannels;
+		int bufferSize;
+		double sampleRate;
+	};
+
 	// Get elements from template packs.
 	template<int N, typename... Ts> using NthTypeOf =
 		typename std::tuple_element<N, std::tuple<Ts...>>::type;
@@ -26,14 +34,15 @@ namespace Audijo
 	// Valid sample formats
 	template<typename Format>
 	concept ValidFormat = 
-		   std::is_same_v<Format, int*> 
-		|| std::is_same_v<Format, float*> 
-		|| std::is_same_v<Format, double*>;
+		   std::is_same_v<Format, int**>
+		|| std::is_same_v<Format, float**>
+		|| std::is_same_v<Format, double**>;
 
 	// Valid callback signature
-	template<typename Ret, typename InFormat, typename OutFormat, typename ...UserData>
+	template<typename Ret, typename InFormat, typename OutFormat, typename CI,  typename ...UserData>
 	concept ValidCallback = std::is_same_v<Ret, int>       // Return must be int
 		&& ValidFormat<InFormat> && ValidFormat<OutFormat> // First 2 must be valid formats
+		&& std::is_same_v<CI, CallbackInfo>
 		&& sizeof...(UserData) <= 1 && ((std::is_reference_v<UserData> && ...) 
 			|| (std::is_pointer_v<UserData> && ...));      // userdata is optional, must be reference or pointer
 
@@ -54,7 +63,7 @@ namespace Audijo
 	 */
 	struct CallbackWrapperBase
 	{
-		virtual int Call(void* in, void* out, void* userdata) = 0;
+		virtual int Call(void** in, void** out, CallbackInfo&& info, void* userdata) = 0;
 	};
 
 	template<typename, typename>
@@ -72,23 +81,26 @@ namespace Audijo
 			: m_Callback(callback)
 		{}
 
-		int Call(void* in, void* out, void* userdata) override
+		int Call(void** in, void** out, CallbackInfo&& info, void* userdata) override
 		{
-			if constexpr (sizeof...(Args) == 3)
+			if constexpr (sizeof...(Args) == 4)
 				if constexpr (std::is_reference_v<NthTypeOf<2, Args...>>)
 					return m_Callback(
 						reinterpret_cast<NthTypeOf<0, Args...>>(in),
-						reinterpret_cast<NthTypeOf<1, Args...>>(out),
-						*reinterpret_cast<std::remove_reference_t<NthTypeOf<2, Args...>>*>(out));
+						reinterpret_cast<NthTypeOf<1, Args...>>(out), 
+						std::forward<CallbackInfo>(info),
+						*reinterpret_cast<std::remove_reference_t<NthTypeOf<3, Args...>>*>(userdata));
 				else 
 					return m_Callback(
 						reinterpret_cast<NthTypeOf<0, Args...>>(in),
-						reinterpret_cast<NthTypeOf<1, Args...>>(out),
-						reinterpret_cast<NthTypeOf<2, Args...>>(out));
+						reinterpret_cast<NthTypeOf<1, Args...>>(out), 
+						std::forward<CallbackInfo>(info),
+						reinterpret_cast<NthTypeOf<3, Args...>>(userdata));
 			else 
 				return m_Callback(
 					reinterpret_cast<NthTypeOf<0, Args...>>(in),
-					reinterpret_cast<NthTypeOf<1, Args...>>(out));
+					reinterpret_cast<NthTypeOf<1, Args...>>(out), 
+					std::forward<CallbackInfo>(info));
 		}
 
 	private:

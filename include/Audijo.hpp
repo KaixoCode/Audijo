@@ -11,7 +11,7 @@ namespace Audijo
 	};
 
 	template<Api api = Unspecified>
-	class Stream 
+	class Stream
 	{
 	public:
 		/**
@@ -55,27 +55,34 @@ namespace Audijo
 		 * Open the stream.
 		 * @param settings StreamSettings
 		 */
-		void OpenStream(const StreamSettings& settings = StreamSettings{}) { m_Api->OpenStream(settings); };
+		Error OpenStream(const StreamSettings& settings = StreamSettings{}) { return m_Api->OpenStream(settings); };
 
 		/**
 		 * Starts the flow of audio through the opened stream. Does nothing
 		 * if the stream has not been opened yet.
 		 */
-		void StartStream() { m_Api->StartStream(); };
+		Error StartStream() { return m_Api->StartStream(); };
 
 		/**
 		 * Stop the flow of audio through the stream. Does nothing if the
 		 * stream hasn't been started or opened yet.
 		 */
-		void StopStream() { m_Api->StopStream(); };
+		Error StopStream() { return m_Api->StopStream(); };
 
 		/**
 		 * Close the stream. Also stops the stream if it hasn't been stopped yet.
 		 * Does nothing if the stream hasn't been opened yet.
 		 */
-		void CloseStream() { m_Api->CloseStream(); };
+		Error CloseStream() { return m_Api->CloseStream(); };
 
-	//protected:
+		/**
+		 * Set the userdata
+		 * @param data userdata
+		 */
+		template<typename T>
+		void UserData(T& data) { m_Api->UserData(data); };
+
+	protected:
 		std::unique_ptr<ApiBase> m_Api;
 	};
 
@@ -99,7 +106,7 @@ namespace Audijo
 		/**
 		 * TODO: Opens the ASIO control panel.
 		 */
-		void OpenControlPanel() {}
+		void OpenControlPanel() { ((AsioApi*)m_Api.get())->OpenControlPanel(); }
 	};
 
 	Stream(Api)->Stream<Unspecified>;
