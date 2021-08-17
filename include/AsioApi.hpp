@@ -20,10 +20,11 @@ namespace Audijo
 		Error StopStream() override;
 		Error CloseStream() override;
 
-		void OpenControlPanel() { ASIOControlPanel(); }
+		Error OpenControlPanel();
 
 	protected:
 		StreamSettings m_Settings;
+		bool m_Queried = false;
 		
 		static void SampleRateDidChange(ASIOSampleRate sRate);
 		static long AsioMessage(long selector, long value, void* message, double* opt);

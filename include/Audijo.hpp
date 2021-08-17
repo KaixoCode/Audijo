@@ -106,7 +106,7 @@ namespace Audijo
 		/**
 		 * TODO: Opens the ASIO control panel.
 		 */
-		void OpenControlPanel() { ((AsioApi*)m_Api.get())->OpenControlPanel(); }
+		Error OpenControlPanel() { return ((AsioApi*)m_Api.get())->OpenControlPanel(); }
 	};
 
 	Stream(Api)->Stream<Unspecified>;

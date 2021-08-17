@@ -117,6 +117,7 @@ namespace Audijo
 		for (auto& i : _toDelete)
 			m_Devices.erase(m_Devices.begin() + i);
 
+		m_Queried = true;
 		return m_Devices;
 	}
 
@@ -129,6 +130,13 @@ namespace Audijo
 
 		// Store stream settings
 		m_Settings = settings;
+
+		// If only one of the device ids has been set, set other one to the same one.
+		if (m_Settings.input.deviceId == -1 && m_Settings.output.deviceId != -1)
+			m_Settings.input.deviceId = m_Settings.output.deviceId;
+
+		if (m_Settings.input.deviceId != -1 && m_Settings.output.deviceId == -1)
+			m_Settings.output.deviceId = m_Settings.input.deviceId;
 
 		// For an ASIO the input and output device need to be the same.
 		if (m_Settings.input.deviceId != m_Settings.output.deviceId)
@@ -152,36 +160,36 @@ namespace Audijo
 			m_Settings.input.deviceId = 0; // Also update in settings
 		}
 
-		// Open the driver
-		drivers.asioOpenDriver(_deviceId, (void**)&theAsioDriver);
-
 		// If nmr of channels is not set, set it to max
-		long _in, _out;
-		theAsioDriver->getChannels(&_in, &_out);
-		if (_nInChannels == -1)
+		if (!m_Queried) Devices(); // If devices have never been queried, do it now to get device infos
+		long _in = m_Devices[_deviceId].inputChannels, _out = m_Devices[_deviceId].outputChannels;
+		if (_nInChannels <= -1)
 		{
 			_nInChannels = _in;
 			_nChannels = _nInChannels + _nOutChannels;
 			m_Settings.input.channels = _in; // Also update in settings
 		}
 
-		if (_nOutChannels == -1)
+		if (_nOutChannels <= -1)
 		{
 			_nOutChannels = _out;
 			_nChannels = _nInChannels + _nOutChannels;
 			m_Settings.output.channels = _out; // Also update in settings
 		}
 
+		// Open the driver
+		drivers.asioOpenDriver(_deviceId, (void**)&theAsioDriver);
+
 		// Init the ASIO
 		driverInfo.asioVersion = 2;
 		driverInfo.sysRef = GetForegroundWindow();
-		auto error = ASIOInit(&driverInfo);
-		if (error != ASE_OK)
+		auto _error = ASIOInit(&driverInfo);
+		if (_error != ASE_OK)
 		{
-			LOGL(getAsioErrorString(error));
+			LOGL("Failed to initialize ASIO: " << getAsioErrorString(_error));
 
 			// Either the hardware failed
-			if (error == ASE_HWMalfunction)
+			if (_error == ASE_HWMalfunction)
 				return HardwareFail;
 
 			// Or there is no input/output present
@@ -201,15 +209,15 @@ namespace Audijo
 		}
 
 		// Set samplerate
-		error = ASIOSetSampleRate(_sampleRate);
-		if (error != ASE_OK)
+		_error = ASIOSetSampleRate(_sampleRate);
+		if (_error != ASE_OK)
 		{
 			ASIOExit();
 			m_State = Loaded;
-			LOGL(getAsioErrorString(error));
+			LOGL("Failed to set sample rate to " << _sampleRate << ": " << getAsioErrorString(_error));
 
 			// Either it's an invalid sample rate
-			if (error == ASE_InvalidMode)
+			if (_error == ASE_InvalidMode)
 				return InvalidSampleRate;
 
 			// Or there is no input/output present
@@ -227,18 +235,17 @@ namespace Audijo
 		for (int i = _nInChannels; i < _nChannels; i++)
 			m_BufferInfos[i].isInput = ASIOFalse,
 			m_BufferInfos[i].channelNum = i - _nInChannels;
-		error = ASIOCreateBuffers(m_BufferInfos, _nChannels, _bufferSize, &m_Callbacks);
-		if (error != ASE_OK)
+		_error = ASIOCreateBuffers(m_BufferInfos, _nChannels, _bufferSize, &m_Callbacks);
+		if (_error != ASE_OK)
 		{
-			ASIOExit();
-			LOGL(getAsioErrorString(error));
+			LOGL("Failed to create ASIO buffers: " << getAsioErrorString(_error));
 
 			// Either it failed to allocate memory
-			if (error == ASE_NoMemory)
+			if (_error == ASE_NoMemory)
 				return NoMemory;
 
 			// The buffersize is invalid
-			else if (error == ASE_InvalidMode)
+			else if (_error == ASE_InvalidMode)
 				return InvalidBufferSize;
 
 			// Or the input/output aren't supported
@@ -289,13 +296,28 @@ namespace Audijo
 		if (m_State == Loaded)
 			return NotOpen;
 
+		if (m_State == Running)
+		{
+			auto error = ASIOStop();
+			if (error != ASE_OK)
+				return HardwareFail;
+		}
+
 		auto error = ASIODisposeBuffers();
 		if (error != ASE_OK)
 			return HardwareFail;
 
-		ASIOExit();
 		m_State = Loaded;
 	};
+
+	Error AsioApi::OpenControlPanel()
+	{ 
+		if (m_State == Loaded)
+			return NotOpen;
+
+		ASIOControlPanel(); 
+		return NoError;
+	}
 
 	void AsioApi::SampleRateDidChange(ASIOSampleRate sRate)
 	{
@@ -308,6 +330,12 @@ namespace Audijo
 		{
 		case kAsioSupportsTimeInfo: return true;
 		case kAsioBufferSizeChange: m_AsioApi->m_Settings.bufferSize = value; return true;
+		case kAsioResetRequest: 
+		{
+			m_AsioApi->CloseStream();
+			m_AsioApi->OpenStream(m_AsioApi->m_Settings);
+			return true;
+		}
 		}
 		return 0;
 	};
