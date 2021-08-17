@@ -6,7 +6,8 @@ int main()
 {
 
 	Stream<Asio> _stream;
-	auto& devs = _stream.Devices();
+	auto& devs1 = _stream.Devices();
+	auto& devs2 = _stream.Devices();
 
 
 	int _counter = 0;

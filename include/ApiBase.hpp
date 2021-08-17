@@ -6,11 +6,11 @@ namespace Audijo
 {
 	struct DeviceInfo 
 	{
-		const int id;
-		const std::string name;
-		const int inputChannels;
-		const int outputChannels;
-		const std::vector<double> sampleRates;
+		int id;
+		std::string name;
+		int inputChannels;
+		int outputChannels;
+		std::vector<double> sampleRates;
 	};
 
 	struct Parameters 

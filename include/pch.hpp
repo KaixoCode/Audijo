@@ -14,7 +14,7 @@
 #include <vector>
 #include <cassert>
 #include <concepts>
-
+#include <algorithm>
 
 
 #define LOGL(x) std::cout << x << std::endl
