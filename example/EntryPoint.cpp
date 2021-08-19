@@ -16,10 +16,12 @@ int main()
 
 	StreamSettings _settings;
 	_settings.bufferSize = 256;
-	_settings.sampleRate = 48000;
+	_settings.sampleRate = 44100;
 	_settings.output.deviceId = 0;
 	_stream.OpenStream(_settings);
 	_stream.StartStream();
+
+	_stream.OpenControlPanel();
 
 	while (true);
 }
