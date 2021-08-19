@@ -64,6 +64,8 @@ namespace Audijo
 	struct CallbackWrapperBase
 	{
 		virtual int Call(void** in, void** out, CallbackInfo&& info, void* userdata) = 0;
+		virtual int Bytes() = 0;
+		virtual bool Floating() = 0;
 	};
 
 	template<typename, typename>
@@ -80,6 +82,9 @@ namespace Audijo
 		CallbackWrapper(Type callback)
 			: m_Callback(callback)
 		{}
+
+		int Bytes() override { return sizeof(std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>); }
+		bool Floating() override { return std::is_floating_point_v<std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>>; }
 
 		int Call(void** in, void** out, CallbackInfo&& info, void* userdata) override
 		{

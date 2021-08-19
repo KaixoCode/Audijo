@@ -128,21 +128,42 @@ namespace Audijo
 		if (m_State != Loaded)
 			return AlreadyOpen;
 
+		// Make sure to free buffers first
+		FreeBuffers();
+
 		// Store stream settings
 		m_Settings = settings;
 
-		// If only one of the device ids has been set, set other one to the same one.
-		if (m_Settings.input.deviceId == -1 && m_Settings.output.deviceId != -1)
-			m_Settings.input.deviceId = m_Settings.output.deviceId;
-
-		if (m_Settings.input.deviceId != -1 && m_Settings.output.deviceId == -1)
-			m_Settings.output.deviceId = m_Settings.input.deviceId;
-
-		// For an ASIO the input and output device need to be the same.
-		if (m_Settings.input.deviceId != m_Settings.output.deviceId)
+		// Check device ids
 		{
-			LOGL("The input and output device should be the same when creating a duplex ASIO stream.");
-			return InvalidDuplex;
+			// If only one of the device ids has been set, set other one to the same one.
+			if (m_Settings.input.deviceId == -1 && m_Settings.output.deviceId != -1)
+				m_Settings.input.deviceId = m_Settings.output.deviceId;
+
+			if (m_Settings.input.deviceId != -1 && m_Settings.output.deviceId == -1)
+				m_Settings.output.deviceId = m_Settings.input.deviceId;
+
+			// For an ASIO the input and output device need to be the same.
+			if (m_Settings.input.deviceId != m_Settings.output.deviceId)
+			{
+				LOGL("The input and output device should be the same when creating a duplex ASIO stream.");
+				return InvalidDuplex;
+			}
+
+			// Since ASIO doesn't have a 'default' device, just set it to 0 if none is selected
+			if (m_Settings.input.deviceId == -1)
+				m_Settings.input.deviceId = 0; 
+		}
+
+		// Set default channel count
+		{
+			// If nmr of channels is not set, set it to max
+			if (!m_Queried) Devices(); // If devices have never been queried, do it now to get device infos
+			if (m_Settings.input.channels <= -1)
+				m_Settings.input.channels = m_Devices[m_Settings.input.deviceId].inputChannels;
+
+			if (m_Settings.output.channels <= -1)
+				m_Settings.output.channels = m_Devices[m_Settings.output.deviceId].outputChannels;
 		}
 
 		// Retrieve necessary settings;
@@ -153,106 +174,157 @@ namespace Audijo
 		int _bufferSize = m_Settings.bufferSize;
 		int _sampleRate = m_Settings.sampleRate;
 
-		// Since ASIO doesn't have a 'default' device, just set it to 0 if none is selected
-		if (_deviceId == -1)
-		{
-			_deviceId = 0;
-			m_Settings.input.deviceId = 0; // Also update in settings
-		}
-
-		// If nmr of channels is not set, set it to max
-		if (!m_Queried) Devices(); // If devices have never been queried, do it now to get device infos
-		long _in = m_Devices[_deviceId].inputChannels, _out = m_Devices[_deviceId].outputChannels;
-		if (_nInChannels <= -1)
-		{
-			_nInChannels = _in;
-			_nChannels = _nInChannels + _nOutChannels;
-			m_Settings.input.channels = _in; // Also update in settings
-		}
-
-		if (_nOutChannels <= -1)
-		{
-			_nOutChannels = _out;
-			_nChannels = _nInChannels + _nOutChannels;
-			m_Settings.output.channels = _out; // Also update in settings
-		}
-
 		// Open the driver
-		drivers.asioOpenDriver(_deviceId, (void**)&theAsioDriver);
-
-		// Init the ASIO
-		driverInfo.asioVersion = 2;
-		driverInfo.sysRef = GetForegroundWindow();
-		auto _error = ASIOInit(&driverInfo);
-		if (_error != ASE_OK)
 		{
-			LOGL("Failed to initialize ASIO: " << getAsioErrorString(_error));
+			drivers.asioOpenDriver(_deviceId, (void**)&theAsioDriver);
 
-			// Either the hardware failed
-			if (_error == ASE_HWMalfunction)
-				return HardwareFail;
+			// Init the ASIO
+			driverInfo.asioVersion = 2;
+			driverInfo.sysRef = GetForegroundWindow();
+			auto _error = ASIOInit(&driverInfo);
+			if (_error != ASE_OK)
+			{
+				LOGL("Failed to initialize ASIO: " << getAsioErrorString(_error));
 
-			// Or there is no input/output present
-			else
-				return NotPresent;
-		}
-		m_State = Initialized;
-
-		// If no samplerate has been selected, pick one.
-		if (_sampleRate == -1)
-		{
-			int _index = 0;
-			while (ASIOCanSampleRate(m_SampleRates[_index]) != ASE_OK)
-				_index++;
-			_sampleRate = m_SampleRates[_index];
-			m_Settings.sampleRate = _sampleRate; // Also update in settings
+				// Either the hardware failed or there is no input/output present
+				return _error == ASE_HWMalfunction ? HardwareFail : NotPresent;
+			}
+			m_State = Initialized;
 		}
 
-		// Set samplerate
-		_error = ASIOSetSampleRate(_sampleRate);
-		if (_error != ASE_OK)
+		// SampleRate
 		{
-			ASIOExit();
-			m_State = Loaded;
-			LOGL("Failed to set sample rate to " << _sampleRate << ": " << getAsioErrorString(_error));
+			// If no samplerate has been selected, pick one.
+			if (_sampleRate == -1)
+			{
+				int _index = 0;
+				while (_index < sizeof(m_SampleRates) / sizeof(double) && ASIOCanSampleRate(m_SampleRates[_index]) != ASE_OK)
+					_index++;
+				_sampleRate = m_SampleRates[_index];
+				m_Settings.sampleRate = _sampleRate; // Also update in settings
+			}
 
-			// Either it's an invalid sample rate
-			if (_error == ASE_InvalidMode)
-				return InvalidSampleRate;
+			// Set samplerate
+			auto _error = ASIOSetSampleRate(_sampleRate);
+			if (_error != ASE_OK)
+			{
+				LOGL("Failed to set sample rate to " << _sampleRate << ": " << getAsioErrorString(_error));
+				m_State = Loaded; // Reset the state to loaded
 
-			// Or there is no input/output present
-			else
+				// Either it's an invalid sample rate or there is no input/output present
+				return _error == ASE_InvalidMode ? InvalidSampleRate : NotPresent;
+			}
+		}
+
+		// Get channel formats
+		{
+			// Input channels
+			ASIOChannelInfo _inChannelInfo;
+			_inChannelInfo.channel = 0;
+			_inChannelInfo.isInput = true;
+			auto _error = ASIOGetChannelInfo(&_inChannelInfo);
+			if (_error != ASE_OK) 
+			{
+				LOGL("Failed to collect channel info: " << getAsioErrorString(_error));
+				m_State = Loaded;  // Reset the state to loaded
 				return NotPresent;
+			}
+
+			m_Settings.m_InByteSwap = false;
+			m_Settings.m_DeviceInFormat = Float32;
+			switch (_inChannelInfo.type)
+			{
+			case ASIOSTInt16MSB: m_Settings.m_InByteSwap = true;
+			case ASIOSTInt16LSB: m_Settings.m_DeviceInFormat = Int16;
+				break;			
+			case ASIOSTInt32MSB: m_Settings.m_InByteSwap = true;
+			case ASIOSTInt32LSB: m_Settings.m_DeviceInFormat = Int32;
+				break;			
+			case ASIOSTFloat32MSB: m_Settings.m_InByteSwap = true;
+			case ASIOSTFloat32LSB: m_Settings.m_DeviceInFormat = Float32;
+				break;			
+			case ASIOSTFloat64MSB: m_Settings.m_InByteSwap = true;
+			case ASIOSTFloat64LSB: m_Settings.m_DeviceInFormat = Float64;
+				break;
+			}
+
+			// Output channels
+			ASIOChannelInfo _outChannelInfo;
+			_outChannelInfo.channel = 0;
+			_outChannelInfo.isInput = true;
+			_error = ASIOGetChannelInfo(&_outChannelInfo);
+			if (_error != ASE_OK)
+			{
+				LOGL("Failed to collect channel info: " << getAsioErrorString(_error));
+				m_State = Loaded;  // Reset the state to loaded
+				return NotPresent;
+			}
+
+			m_Settings.m_OutByteSwap = false;
+			m_Settings.m_DeviceOutFormat = Float32;
+			switch (_outChannelInfo.type)
+			{
+			case ASIOSTInt16MSB: m_Settings.m_OutByteSwap = true;
+			case ASIOSTInt16LSB: m_Settings.m_DeviceOutFormat = Int16;
+				break;
+			case ASIOSTInt32MSB: m_Settings.m_OutByteSwap = true;
+			case ASIOSTInt32LSB: m_Settings.m_DeviceOutFormat = Int32;
+				break;
+			case ASIOSTFloat32MSB: m_Settings.m_OutByteSwap = true;
+			case ASIOSTFloat32LSB: m_Settings.m_DeviceOutFormat = Float32;
+				break;
+			case ASIOSTFloat64MSB: m_Settings.m_OutByteSwap = true;
+			case ASIOSTFloat64LSB: m_Settings.m_DeviceOutFormat = Float64;
+				break;
+			}
+
+			// If callback has been set, deduce format type
+			if (m_Callback)
+			{
+				int bytes = m_Callback->Bytes();
+				bool floating = m_Callback->Floating();
+
+				if (floating)
+					m_Settings.m_Format = bytes == 4 ? Float32 : Float64;
+				else
+					m_Settings.m_Format = bytes == 1 ? Int8 : bytes == 2 ? Int16 : Int32;
+			}
+			else
+			{
+				LOGL("Failed to deduce sample format, no callback was set.");
+				return NoCallback;
+			}
 		}
 
 		// Create the buffer
-		if (m_BufferInfos)
-			delete[] m_BufferInfos;
-		m_BufferInfos = new ASIOBufferInfo[_nChannels];
-		for (int i = 0; i < _nInChannels; i++)
-			m_BufferInfos[i].isInput = ASIOTrue,
-			m_BufferInfos[i].channelNum = i;
-		for (int i = _nInChannels; i < _nChannels; i++)
-			m_BufferInfos[i].isInput = ASIOFalse,
-			m_BufferInfos[i].channelNum = i - _nInChannels;
-		_error = ASIOCreateBuffers(m_BufferInfos, _nChannels, _bufferSize, &m_Callbacks);
-		if (_error != ASE_OK)
 		{
-			LOGL("Failed to create ASIO buffers: " << getAsioErrorString(_error));
+			// First clean up any previous buffer infos
+			if (m_BufferInfos)
+				delete[] m_BufferInfos;
 
-			// Either it failed to allocate memory
-			if (_error == ASE_NoMemory)
-				return NoMemory;
+			// Allocate new buffer info objects
+			m_BufferInfos = new ASIOBufferInfo[_nChannels];
+			for (int i = 0; i < _nInChannels; i++)
+				m_BufferInfos[i].isInput = true,
+				m_BufferInfos[i].channelNum = i;
+			for (int i = _nInChannels; i < _nChannels; i++)
+				m_BufferInfos[i].isInput = false,
+				m_BufferInfos[i].channelNum = i - _nInChannels;
 
-			// The buffersize is invalid
-			else if (_error == ASE_InvalidMode)
-				return InvalidBufferSize;
+			// Create the buffers
+			auto _error = ASIOCreateBuffers(m_BufferInfos, _nChannels, _bufferSize, &m_Callbacks);
+			if (_error != ASE_OK)
+			{
+				LOGL("Failed to create ASIO buffers: " << getAsioErrorString(_error));
 
-			// Or the input/output aren't supported
-			else
-				return NotPresent;
+				// Either it failed to allocate memory, the buffersize is invalid or the input/output aren't present
+				return _error == ASE_NoMemory ? NoMemory : _error == ASE_InvalidMode ? InvalidBufferSize : NotPresent;
+			}
+			m_State = Prepared;
+
+			// Allocate the user callback buffers
+			AllocateBuffers();
 		}
-		m_State = Prepared;
 
 		// Since we can only have a single asio instance open at any time, set 
 		// a static object to 'this' for access in the callbacks.
@@ -321,7 +393,7 @@ namespace Audijo
 
 	void AsioApi::SampleRateDidChange(ASIOSampleRate sRate)
 	{
-
+		m_AsioApi->m_Settings.sampleRate = sRate;
 	};
 
 	long AsioApi::AsioMessage(long selector, long value, void* message, double* opt)
@@ -329,13 +401,21 @@ namespace Audijo
 		switch (selector)
 		{
 		case kAsioSupportsTimeInfo: return true;
-		case kAsioBufferSizeChange: m_AsioApi->m_Settings.bufferSize = value; return true;
-		case kAsioResetRequest: 
+		case kAsioSupportsTimeCode: return true;
+		case kAsioBufferSizeChange: 
 		{
-			m_AsioApi->CloseStream();
-			m_AsioApi->OpenStream(m_AsioApi->m_Settings);
+			// When the buffer size changes, free the current buffers
+			// and then allocate new buffers for the user callback
+			m_AsioApi->FreeBuffers();
+			m_AsioApi->m_Settings.bufferSize = value;
+			m_AsioApi->AllocateBuffers();
 			return true;
 		}
+		case kAsioResetRequest:
+		{
+			return true;
+		}
+		case kAsioEngineVersion: return 2L;
 		}
 		return 0;
 	};
@@ -343,25 +423,41 @@ namespace Audijo
 	ASIOTime* AsioApi::BufferSwitchTimeInfo(ASIOTime* params, long doubleBufferIndex, ASIOBool directProcess)
 	{
 		// Retrieve information from object
-		int _nInChannels = m_AsioApi->m_Settings.input.channels;
+		int _nInChannels  = m_AsioApi->m_Settings.input.channels;
 		int _nOutChannels = m_AsioApi->m_Settings.output.channels;
-		int _nChannels = _nInChannels + _nOutChannels;
-		int _bufferSize = m_AsioApi->m_Settings.bufferSize;
-		double _sampleRate = m_AsioApi->m_Settings.sampleRate;
+		int _bufferSize   = m_AsioApi->m_Settings.bufferSize;
+		auto _sampleRate  = m_AsioApi->m_Settings.sampleRate;
+		auto _inFormat    = m_AsioApi->m_Settings.m_DeviceInFormat;
+		bool _inSwap      = m_AsioApi->m_Settings.m_InByteSwap;
+		auto _outFormat   = m_AsioApi->m_Settings.m_DeviceOutFormat;
+		bool _outSwap     = m_AsioApi->m_Settings.m_OutByteSwap;
+		auto _format      = m_AsioApi->m_Settings.m_Format;
+		char** _inputs    = m_AsioApi->m_InputBuffers;
+		char** _outputs   = m_AsioApi->m_OutputBuffers;
 
-		// Create array of buffers
-		void** _inputs = new void* [_nInChannels];
-		void** _outputs = new void* [_nOutChannels];
+		// Prepare the input buffer
 		for (int i = 0; i < _nInChannels; i++)
-			_inputs[i] = m_BufferInfos[i].buffers[doubleBufferIndex];
+		{
+			char* _temp = (char*)m_BufferInfos[i].buffers[doubleBufferIndex];
+			if (_inSwap)
+				m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _inFormat);
+			m_AsioApi->ConvertBuffer(_inputs[i], _temp, _bufferSize, _inFormat, _format);
+		}
 
-		for (int i = 0; i < _nOutChannels; i++)
-			_outputs[i] = m_BufferInfos[i + _nInChannels].buffers[doubleBufferIndex];
-
-		// Call user callback
-		m_AsioApi->m_Callback->Call(_inputs, _outputs, CallbackInfo{
+		// usercallback
+		m_AsioApi->m_Callback->Call((void**)_inputs, (void**)_outputs, CallbackInfo{
 			_nInChannels, _nOutChannels, _bufferSize, _sampleRate
 			}, m_AsioApi->m_UserData);
+
+		// Convert the output buffer
+		for (int i = 0; i < _nOutChannels; i++)
+		{
+			char* _temp = (char*)m_BufferInfos[i + _nOutChannels].buffers[doubleBufferIndex];
+			m_AsioApi->ConvertBuffer(_temp, _outputs[i], _bufferSize, _outFormat, _format);
+			if (_outSwap)
+				m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _outFormat);
+		}
+
 		return params;
 	}
 

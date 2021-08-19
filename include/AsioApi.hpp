@@ -23,9 +23,8 @@ namespace Audijo
 		Error OpenControlPanel();
 
 	protected:
-		StreamSettings m_Settings;
 		bool m_Queried = false;
-		
+
 		static void SampleRateDidChange(ASIOSampleRate sRate);
 		static long AsioMessage(long selector, long value, void* message, double* opt);
 		static ASIOTime* BufferSwitchTimeInfo(ASIOTime* params, long doubleBufferIndex, ASIOBool directProcess);
