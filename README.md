@@ -3,6 +3,8 @@
 **It is in beta!**
 Help me test this badboi, I can't really test all edge cases since I myself only have 2 ASIO devices. So if you find any bugs or crashes lemme know. ASIO should function right now, next up is WASAPI.
 
+Documentation: https://code.kaixo.me/Audijo/
+
 Here's a quick example, just generates a sinewave, and opens the first ASIO device it finds.
 ```cpp
 Stream<Asio> _stream;
