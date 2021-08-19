@@ -329,6 +329,7 @@ namespace Audijo
 		// Since we can only have a single asio instance open at any time, set 
 		// a static object to 'this' for access in the callbacks.
 		m_AsioApi = this;
+		return NoError;
 	}
 
 	Error AsioApi::StartStream()

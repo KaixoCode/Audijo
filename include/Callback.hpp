@@ -3,11 +3,29 @@
 
 namespace Audijo
 {
+	/**
+	 * Information given inside of the callback.
+	 */
 	struct CallbackInfo
 	{
+		/**
+		 * Amount of input channels.
+		 */
 		int inputChannels;
+
+		/**
+		 * Amount of output channels.
+		 */
 		int outputChannels;
+
+		/**
+		 * Buffer size
+		 */
 		int bufferSize;
+
+		/**
+		 * Sample rate
+		 */
 		double sampleRate;
 	};
 
@@ -34,14 +52,17 @@ namespace Audijo
 	// Valid sample formats
 	template<typename Format>
 	concept ValidFormat = 
-		   std::is_same_v<Format, int**>
+		   std::is_same_v<Format, int8_t**>
+		|| std::is_same_v<Format, int16_t**>
+		|| std::is_same_v<Format, int32_t**>
 		|| std::is_same_v<Format, float**>
 		|| std::is_same_v<Format, double**>;
 
 	// Valid callback signature
 	template<typename Ret, typename InFormat, typename OutFormat, typename CI,  typename ...UserData>
-	concept ValidCallback = std::is_same_v<Ret, int>       // Return must be int
+	concept ValidCallback = std::is_same_v<Ret, void>      // Return must be void
 		&& ValidFormat<InFormat> && ValidFormat<OutFormat> // First 2 must be valid formats
+		&& std::is_same_v<InFormat, OutFormat>
 		&& std::is_same_v<CI, CallbackInfo>
 		&& sizeof...(UserData) <= 1 && ((std::is_reference_v<UserData> && ...) 
 			|| (std::is_pointer_v<UserData> && ...));      // userdata is optional, must be reference or pointer
@@ -63,7 +84,7 @@ namespace Audijo
 	 */
 	struct CallbackWrapperBase
 	{
-		virtual int Call(void** in, void** out, CallbackInfo&& info, void* userdata) = 0;
+		virtual void Call(void** in, void** out, CallbackInfo&& info, void* userdata) = 0;
 		virtual int Bytes() = 0;
 		virtual bool Floating() = 0;
 	};
@@ -75,8 +96,8 @@ namespace Audijo
 	 * Typed callback wrapper, implements pure virtual Call method and casts data back to
 	 * original type.
 	 */
-	template<typename Type, typename ...Args> requires ValidCallback<int, Args...>
-	class CallbackWrapper<Type, int(Args...)> : public CallbackWrapperBase
+	template<typename Type, typename ...Args> requires ValidCallback<void, Args...>
+	class CallbackWrapper<Type, void(Args...)> : public CallbackWrapperBase
 	{
 	public:
 		CallbackWrapper(Type callback)
@@ -86,23 +107,23 @@ namespace Audijo
 		int Bytes() override { return sizeof(std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>); }
 		bool Floating() override { return std::is_floating_point_v<std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>>; }
 
-		int Call(void** in, void** out, CallbackInfo&& info, void* userdata) override
+		void Call(void** in, void** out, CallbackInfo&& info, void* userdata) override
 		{
 			if constexpr (sizeof...(Args) == 4)
 				if constexpr (std::is_reference_v<NthTypeOf<2, Args...>>)
-					return m_Callback(
+					m_Callback(
 						reinterpret_cast<NthTypeOf<0, Args...>>(in),
 						reinterpret_cast<NthTypeOf<1, Args...>>(out), 
 						std::forward<CallbackInfo>(info),
 						*reinterpret_cast<std::remove_reference_t<NthTypeOf<3, Args...>>*>(userdata));
 				else 
-					return m_Callback(
+					m_Callback(
 						reinterpret_cast<NthTypeOf<0, Args...>>(in),
 						reinterpret_cast<NthTypeOf<1, Args...>>(out), 
 						std::forward<CallbackInfo>(info),
 						reinterpret_cast<NthTypeOf<3, Args...>>(userdata));
 			else 
-				return m_Callback(
+				m_Callback(
 					reinterpret_cast<NthTypeOf<0, Args...>>(in),
 					reinterpret_cast<NthTypeOf<1, Args...>>(out), 
 					std::forward<CallbackInfo>(info));

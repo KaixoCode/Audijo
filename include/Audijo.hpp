@@ -10,13 +10,17 @@ namespace Audijo
 		Unspecified, Asio, Wasapi
 	};
 
+	/**
+	 * Main stream object, with unspecified Api, so it can be dynamically set. To access api specific functions
+	 * you need to cast to an api specific Stream object.
+	 */
 	template<Api api = Unspecified>
 	class Stream
 	{
 	public:
 		/**
 		 * Constructor
-		 * @param api audio api
+		 * @param api Api
 		 */
 		Stream(Api api)
 		{
@@ -28,16 +32,18 @@ namespace Audijo
 		}
 
 		/**
-		 * Search for all available devices.
+		 * Search for all available devices. When called more than once, the list will be updated.
 		 * @return all available devices given the chosen api.
 		 */
 		const std::vector<DeviceInfo>& Devices() { return m_Api->Devices(); }
 
 		/**
-		 * Callback will be moved to a type-erased wrapper inside the ApiBase, where it will be invoked
-		 * on request of the Api, and using the selected formats the callback will then be type-casted
-		 * back into its original form. The userdata will be moved to the type-erased object as a void*
-		 * and when requested to call, will be casted to the correct type inside the type-erased object.
+		 * Set the callback. A valid callback signare is:
+		 * <code>void(Format**, Format**, CallbackInfo, UserObject)</code>
+		 * where <code>Format</code> is one of <code>int8_t, int16_t, int32_t, float, double</code>
+		 * and <code>UserObject</code> is a reference or a pointer to any type. The UserObject is optional
+		 * and can be left out.
+		 * @param callback
 		 */
 		template<typename ...Args> requires ValidCallback<int, Args...>
 		void SetCallback(Callback<Args...> callback)
@@ -45,6 +51,14 @@ namespace Audijo
 			m_Api->SetCallback(std::make_unique<CallbackWrapper<Callback<Args...>, int(Args...)>>(callback));
 		};
 
+		/**
+		 * Set the callback. A valid callback signare is:
+		 * <code>void(Format**, Format**, CallbackInfo, UserObject)</code>
+		 * where <code>Format</code> is one of <code>int8_t, int16_t, int32_t, float, double</code>
+		 * and <code>UserObject</code> is a reference or a pointer to any type. The UserObject is optional
+		 * and can be left out.
+		 * @param callback
+		 */
 		template<typename Lambda> requires LambdaConstraint<Lambda>
 		void SetCallback(Lambda callback)
 		{
@@ -52,27 +66,53 @@ namespace Audijo
 		};
 
 		/**
-		 * Open the stream.
-		 * @param settings StreamSettings
+		 * Open the stream. The StreamSettings are optional, when they are left out a default device
+		 * with a default buffer size and sample rate will be opened.
+		 * @param settings <code>StreamSettings</code>
+		 * @return 
+		 * AlreadyOpen - If the stream is already opened<br>
+		 * InvalidDuplex - If the combination of input and output devices is invalid<br>
+		 * HardwareFail - If the device failed to open<br>
+		 * NotPresent - If the input/output is not present<br>
+		 * InvalidSampleRate - If the sample rate is not supported<br>
+		 * NoCallback - If no callback has been set<br>
+		 * NoMemory - If it failed to allocate the necessary memory<br>
+		 * InvalidBufferSize - If the buffer size is not supported<br>
+		 * NoError - If stream started successfully
 		 */
 		Error OpenStream(const StreamSettings& settings = StreamSettings{}) { return m_Api->OpenStream(settings); };
 
 		/**
 		 * Starts the flow of audio through the opened stream. Does nothing
-		 * if the stream has not been opened yet.
+		 * if the stream has not been opened yet.<br>
+		 * @return 
+		 * NotOpen - If the stream wasn't opened<br>
+		 * AlreadyRunning - If the stream is already running<br>
+		 * HardwareFail - If device failed to start<br>
+		 * NoError - If stream started successfully
 		 */
 		Error StartStream() { return m_Api->StartStream(); };
 
 		/**
 		 * Stop the flow of audio through the stream. Does nothing if the
 		 * stream hasn't been started or opened yet.
+		 * @return 
+		 * NotOpen - If the stream wasn't opened<br>
+		 * NotRunning - If the stream is not running<br>
+		 * HardwareFail - If device failed to stop<br>
+		 * NoError - If stream stopped successfully
 		 */
 		Error StopStream() { return m_Api->StopStream(); };
 
 		/**
 		 * Close the stream. Also stops the stream if it hasn't been stopped yet.
 		 * Does nothing if the stream hasn't been opened yet.
+		 * @return 
+		 * NotOpen - If the stream wasn't opened<br>
+		 * HardwareFail - If device failed to close<br>
+		 * NoError - If stream stopped successfully
 		 */
+
 		Error CloseStream() { return m_Api->CloseStream(); };
 
 		/**
@@ -86,6 +126,10 @@ namespace Audijo
 		std::unique_ptr<ApiBase> m_Api;
 	};
 
+	/**
+	 * Wasapi specific Stream object, for when api is decided at compiletime, 
+	 * exposes api specific functions directly.
+	 */
 	template<>
 	class Stream<Wasapi> : public Stream<>
 	{
@@ -95,6 +139,10 @@ namespace Audijo
 		{}
 	};
 
+	/**
+	 * Asio specific Stream object, for when api is decided at compiletime,
+	 * exposes api specific functions directly.
+	 */
 	template<>
 	class Stream<Asio> : public Stream<>
 	{
@@ -104,7 +152,7 @@ namespace Audijo
 		{}
 
 		/**
-		 * TODO: Opens the ASIO control panel.
+		 * Opens the ASIO control panel.
 		 */
 		Error OpenControlPanel() { return ((AsioApi*)m_Api.get())->OpenControlPanel(); }
 	};
