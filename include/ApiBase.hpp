@@ -107,12 +107,7 @@ namespace Audijo
 	class ApiBase
 	{
 	public:
-
-		virtual ~ApiBase() 
-		{
-			// Free the callback buffers
-			FreeBuffers();
-		}
+		virtual ~ApiBase() { FreeBuffers(); }
 		virtual const std::vector<DeviceInfo>& Devices() = 0;
 
 		virtual Error OpenStream(const StreamSettings& settings = StreamSettings{}) = 0;
@@ -143,5 +138,4 @@ namespace Audijo
 		char** m_InputBuffers = nullptr;
 		char** m_OutputBuffers = nullptr;
 	};
-
 }
