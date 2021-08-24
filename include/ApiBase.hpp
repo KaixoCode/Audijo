@@ -35,19 +35,26 @@ namespace Audijo
 		 * Supported sample rates
 		 */
 		std::vector<double> sampleRates;
+	
+		/**
+		 * Default device
+		 */
+		bool defaultDevice;
 	};
 
+	enum Device { DefaultDevice = -2, NoDevice = -1 };
+
 	struct Parameters 
-	{		
+	{
 		/**
 		 * Device id
 		 */
-		int deviceId = -1;
+		int deviceId = NoDevice;
 
 	    /**
 		 * Amount of channels
 		 */
-		int channels = -1;
+		int channels = NoDevice;
 	};
 
 	struct StreamSettings
@@ -80,6 +87,7 @@ namespace Audijo
 		bool m_OutByteSwap = false;
 
 		friend class AsioApi;
+		friend class WasapiApi;
 		friend class ApiBase;
 	};
 
@@ -92,6 +100,8 @@ namespace Audijo
 
 		InvalidSampleRate, // Device does not support sample rate
 		InvalidBufferSize, // Device does not support buffer size
+		
+		UnsupportedSampleFormat, // Audijo does not support sample format of device
 
 		NoCallback,     // The callback was not set
 
@@ -99,7 +109,7 @@ namespace Audijo
 		NotRunning,     // Stream is not running
 		AlreadyOpen,    // Stream is already open
 		AlreadyRunning, // Stream is already running
-		HardwareFail,   // Hardware fail
+		Fail,           // General fail, either hardware or other. (Api specific fail)
 
 		InvalidDuplex,  // Combination of devices in duplex channel is invalid
 	};

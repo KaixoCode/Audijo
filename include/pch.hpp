@@ -8,6 +8,10 @@
 #include <unknwn.h>
 //#include <gdiplus.h>
 #include <windowsx.h>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <FunctionDiscoveryKeys_devpkey.h>
+#include <Devpkey.h>
 
 #undef min
 #undef max

@@ -12,7 +12,8 @@ namespace Audijo
 	{
 		enum State { Loaded, Initialized, Prepared, Running };
 	public:
-
+		AsioApi();
+		
 		const std::vector<DeviceInfo>& Devices() override;
 
 		Error OpenStream(const StreamSettings& settings = StreamSettings{}) override;
@@ -23,8 +24,6 @@ namespace Audijo
 		Error OpenControlPanel();
 
 	protected:
-		bool m_Queried = false;
-
 		static void SampleRateDidChange(ASIOSampleRate sRate);
 		static long AsioMessage(long selector, long value, void* message, double* opt);
 		static ASIOTime* BufferSwitchTimeInfo(ASIOTime* params, long doubleBufferIndex, ASIOBool directProcess);

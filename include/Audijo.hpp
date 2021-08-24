@@ -2,6 +2,7 @@
 #include "pch.hpp"
 #include "ApiBase.hpp"
 #include "AsioApi.hpp"
+#include "WasapiApi.hpp"
 
 namespace Audijo
 {
@@ -27,6 +28,7 @@ namespace Audijo
 			switch (api)
 			{
 			case Asio: m_Api = std::make_unique<AsioApi>(); break;
+			case Wasapi: m_Api = std::make_unique<WasapiApi>(); break;
 			default: throw std::exception("Incompatible api");
 			}
 		}
@@ -72,7 +74,7 @@ namespace Audijo
 		 * @return 
 		 * AlreadyOpen - If the stream is already opened<br>
 		 * InvalidDuplex - If the combination of input and output devices is invalid<br>
-		 * HardwareFail - If the device failed to open<br>
+		 * Fail - If the device failed to open<br>
 		 * NotPresent - If the input/output is not present<br>
 		 * InvalidSampleRate - If the sample rate is not supported<br>
 		 * NoCallback - If no callback has been set<br>
@@ -88,7 +90,7 @@ namespace Audijo
 		 * @return 
 		 * NotOpen - If the stream wasn't opened<br>
 		 * AlreadyRunning - If the stream is already running<br>
-		 * HardwareFail - If device failed to start<br>
+		 * Fail - If device failed to start<br>
 		 * NoError - If stream started successfully
 		 */
 		Error StartStream() { return m_Api->StartStream(); };
@@ -99,7 +101,7 @@ namespace Audijo
 		 * @return 
 		 * NotOpen - If the stream wasn't opened<br>
 		 * NotRunning - If the stream is not running<br>
-		 * HardwareFail - If device failed to stop<br>
+		 * Fail - If device failed to stop<br>
 		 * NoError - If stream stopped successfully
 		 */
 		Error StopStream() { return m_Api->StopStream(); };
@@ -109,7 +111,7 @@ namespace Audijo
 		 * Does nothing if the stream hasn't been opened yet.
 		 * @return 
 		 * NotOpen - If the stream wasn't opened<br>
-		 * HardwareFail - If device failed to close<br>
+		 * Fail - If device failed to close<br>
 		 * NoError - If stream stopped successfully
 		 */
 

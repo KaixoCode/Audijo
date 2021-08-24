@@ -36,6 +36,12 @@ extern IASIO* theAsioDriver;
 
 namespace Audijo
 {
+	AsioApi::AsioApi()
+		: ApiBase()
+	{   // Load devices
+		Devices();
+	}
+
 	const std::vector<DeviceInfo>& AsioApi::Devices()
 	{
 		// Make a list of all numbers from 0 to amount of current devices
@@ -101,6 +107,7 @@ namespace Audijo
 					_device.inputChannels = _in;
 					_device.outputChannels = _out;
 					_device.sampleRates = _srates;
+					_device.defaultDevice = i == 0; // No default in ASIO, so just id == 0
 
 					// Erase from the toDelete, since we've still found the device!
 					_toDelete.erase(std::find(_toDelete.begin(), _toDelete.end(), _index));
@@ -109,15 +116,14 @@ namespace Audijo
 				_index++;
 			}
 
-			if (!_found)
-				m_Devices.push_back(DeviceInfo{ i, _name, _in, _out, _srates });
+			if (!_found) // No default in ASIO, so just id == 0
+				m_Devices.push_back(DeviceInfo{ i, _name, _in, _out, _srates, i == 0 });
 		}
 
 		// Delete all devices we couldn't find again.
 		for (auto& i : _toDelete)
 			m_Devices.erase(m_Devices.begin() + i);
 
-		m_Queried = true;
 		return m_Devices;
 	}
 
@@ -137,10 +143,10 @@ namespace Audijo
 		// Check device ids
 		{
 			// If only one of the device ids has been set, set other one to the same one.
-			if (m_Settings.input.deviceId == -1 && m_Settings.output.deviceId != -1)
+			if (m_Settings.input.deviceId == NoDevice && m_Settings.output.deviceId != NoDevice)
 				m_Settings.input.deviceId = m_Settings.output.deviceId;
 
-			if (m_Settings.input.deviceId != -1 && m_Settings.output.deviceId == -1)
+			if (m_Settings.input.deviceId != NoDevice && m_Settings.output.deviceId == NoDevice)
 				m_Settings.output.deviceId = m_Settings.input.deviceId;
 
 			// For an ASIO the input and output device need to be the same.
@@ -151,14 +157,13 @@ namespace Audijo
 			}
 
 			// Since ASIO doesn't have a 'default' device, just set it to 0 if none is selected
-			if (m_Settings.input.deviceId == -1)
-				m_Settings.input.deviceId = 0; 
+			if (m_Settings.input.deviceId == DefaultDevice)
+				m_Settings.input.deviceId = m_Settings.output.deviceId = 0;
 		}
 
 		// Set default channel count
 		{
 			// If nmr of channels is not set, set it to max
-			if (!m_Queried) Devices(); // If devices have never been queried, do it now to get device infos
 			if (m_Settings.input.channels <= -1)
 				m_Settings.input.channels = m_Devices[m_Settings.input.deviceId].inputChannels;
 
@@ -187,7 +192,7 @@ namespace Audijo
 				LOGL("Failed to initialize ASIO: " << getAsioErrorString(_error));
 
 				// Either the hardware failed or there is no input/output present
-				return _error == ASE_HWMalfunction ? HardwareFail : NotPresent;
+				return _error == ASE_HWMalfunction ? Fail : NotPresent;
 			}
 			m_State = Initialized;
 		}
@@ -342,7 +347,7 @@ namespace Audijo
 
 		auto error = ASIOStart();
 		if (error != ASE_OK)
-			return HardwareFail;
+			return Fail;
 
 		m_State = Running;
 		return NoError;
@@ -358,7 +363,7 @@ namespace Audijo
 
 		auto error = ASIOStop();
 		if (error != ASE_OK)
-			return HardwareFail;
+			return Fail;
 
 		m_State = Prepared;
 		return NoError;
@@ -373,12 +378,12 @@ namespace Audijo
 		{
 			auto error = ASIOStop();
 			if (error != ASE_OK)
-				return HardwareFail;
+				return Fail;
 		}
 
 		auto error = ASIODisposeBuffers();
 		if (error != ASE_OK)
-			return HardwareFail;
+			return Fail;
 
 		m_State = Loaded;
 	};
