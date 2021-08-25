@@ -370,41 +370,39 @@ namespace Audijo
 
 					if (m_OutputClient)
 					{
-
-						m_OutputClient->GetBufferSize(&_outputFrameCount);
-
 						// See how much buffer space is available.
 						CHECK(m_OutputClient->GetCurrentPadding(&_framePadding), "Failed to get current frame padding", break);
 						_outputFramesAvailable = _outputFrameCount - _framePadding;
+
+						_outputFramesAvailable = _bufferSize * (_outputFramesAvailable / _bufferSize);
 					
 						// Get the output buffer to fill
 						CHECK(m_RenderClient->GetBuffer(_outputFramesAvailable, &_deviceOutputBuffer), "Failed to get output buffer", break);
 					}
 
-					//for (int i = 0; i < _outputFramesAvailable / _bufferSize; i++)
-					//{
-					//	m_Callback->Call((void**)_inputs, (void**)_outputs, CallbackInfo{
-					//		_nInChannels, _nOutChannels, _bufferSize, _sampleRate
-					//		}, m_UserData);
-					//
-					//	for (int c = 0; c < _nOutChannels; c++)
-					//	{
-					//		ConvertBuffer(_tempOutBuffer, _outputs[c], _bufferSize, _outFormat, _format);
-					//		for (int j = 0; j < _bufferSize * (_outFormat & 0xF); j++)
-					//		{
-					//			//   index = frame * size of buffer          + index in buffer
-					//			int _index = i * _bufferSize * (_outFormat & 0xF) * _nOutChannels + (j * _nOutChannels + c);
-					//			_deviceOutputBuffer[_index] = _tempOutBuffer[j];
-					//		}
-					//	}
-					//}
+					float* _buffer = (float*)_deviceOutputBuffer;
 
-					for (int i = 0; i < _outputFramesAvailable * _nOutChannels * (_outFormat & 0xF); i++)
-						_deviceOutputBuffer[i] = (std::rand());
+					for (int i = 0; i < _outputFramesAvailable / _bufferSize; i++)
+					{
+						m_Callback->Call((void**)_inputs, (void**)_outputs, CallbackInfo{
+							_nInChannels, _nOutChannels, _bufferSize, _sampleRate
+							}, m_UserData);
+					
+						for (int c = 0; c < _nOutChannels; c++)
+						{
+							ConvertBuffer(_tempOutBuffer, _outputs[c], _bufferSize, _outFormat, _format);
+							for (int j = 0; j < _bufferSize; j++)
+							{
+								//   index = frame * size of buffer          + index in buffer
+								int _index = i * _bufferSize * _nOutChannels + (j * _nOutChannels + c);
+								_buffer[_index] = ((float*)_tempOutBuffer)[j];
+							}
+						}
+					}
 
 					// Release buffers
 					if (m_InputClient) CHECK(m_CaptureClient->ReleaseBuffer(_inputFramesAvailable), "Failed to release the input buffer", break);
-					CHECK(m_RenderClient->ReleaseBuffer(_outputFramesAvailable, 0), "Failed to release the output buffer", break);
+					if (m_OutputClient) CHECK(m_RenderClient->ReleaseBuffer(_outputFramesAvailable, 0), "Failed to release the output buffer", break);
 					//// Prepare the input buffer
 					//for (int i = 0; i < _nInChannels; i++)
 					//{
