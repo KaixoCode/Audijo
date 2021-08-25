@@ -124,6 +124,7 @@ namespace Audijo
 					_device.outputChannels = _out;
 					_device.sampleRates = _srates;
 					_device.defaultDevice = _default;
+					_device.sampleFormat = _format->wBitsPerSample ;
 
 					// Erase from the toDelete, since we've still found the device!
 					_toDelete.erase(std::find(_toDelete.begin(), _toDelete.end(), _index));
@@ -353,7 +354,7 @@ namespace Audijo
 					CHECK(m_OutputClient->GetService(__uuidof(IAudioRenderClient), (void**)&m_RenderClient), "Unable to retrieve the render client.", return NoError);
 					m_OutputClient->SetEventHandle(_renderEvent);
 
-					m_OutputClient->Start();
+					CHECK(m_OutputClient->Start(), "Couldn't start the device", return NoError);
 					m_OutputClient->GetBufferSize(&_outputFrameCount);					
 				}
 				
@@ -399,7 +400,7 @@ namespace Audijo
 					//}
 
 					for (int i = 0; i < _outputFramesAvailable * _nOutChannels * (_outFormat & 0xF); i++)
-						_deviceOutputBuffer[i] = (std::rand() * 10000) * 0.00001 * 0.3;
+						_deviceOutputBuffer[i] = (std::rand());
 
 					// Release buffers
 					if (m_InputClient) CHECK(m_CaptureClient->ReleaseBuffer(_inputFramesAvailable), "Failed to release the input buffer", break);

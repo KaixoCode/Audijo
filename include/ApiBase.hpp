@@ -45,6 +45,11 @@ namespace Audijo
 		 * Default device
 		 */
 		bool defaultDevice;
+
+		/**
+		 * Sample format
+		 */
+		int sampleFormat;
 	};
 
 	enum Device { DefaultDevice = -2, NoDevice = -1 };
