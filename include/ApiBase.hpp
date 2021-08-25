@@ -59,12 +59,12 @@ namespace Audijo
 		/**
 		 * Device id
 		 */
-		int deviceId = NoDevice;
+		int deviceId = DefaultDevice;
 
 	    /**
 		 * Amount of channels
 		 */
-		int channels = NoDevice;
+		int channels = DefaultDevice;
 	};
 
 	struct StreamSettings

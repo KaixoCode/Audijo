@@ -305,9 +305,9 @@ namespace Audijo
 
 		// TODO Start stream
 		m_State = Running;
-		/*m_AudioThread = std::thread{ [this]()
-			{*/
-				//CHECK(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED), "Failed to CoInitialize thread.", return NoError);
+		m_AudioThread = std::thread{ [this]()
+			{
+				CHECK(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED), "Failed to CoInitialize thread.", return NoError);
 
 				// Retrieve information from object
 				int _nInChannels = m_Settings.input.channels;
@@ -324,22 +324,39 @@ namespace Audijo
 
 				auto _renderEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-				// Output buffer is buffersize * bytes in out format
+				// uffer is buffersize * bytes in out format
+				unsigned int _tRingBufSize = 4 * _bufferSize * (_inFormat & 0xF);
+				unsigned int _tRingBufIndex = 0;
+				unsigned int _tRingBufRead = 0;
+				unsigned int _tRingBufAvail = 0;
+				char* _tempRingBuffer = new char[_tRingBufSize];
+				char* _tempInBuffer = new char[_bufferSize * (_inFormat & 0xF)];
 				char* _tempOutBuffer = new char[_bufferSize * (_outFormat & 0xF)];
 
 				unsigned int _inputFrameCount = 0;
 				unsigned int _inputFramesAvailable = 0;
 				unsigned int _outputFrameCount = 0;
 				unsigned int _outputFramesAvailable = 0;
+				unsigned int _framesAvailable = 0;
 				unsigned int _framePadding = 0;
 				DWORD _inFlags = 0;
 				DWORD _outFlags = 0;
 				BYTE* _deviceInputBuffer = nullptr;
 				BYTE* _deviceOutputBuffer = nullptr;
+
+				Pointer<WAVEFORMATEX> _inWaveFormat;
 				if (m_InputClient)
 				{
+					m_CaptureClient.Release();
+					m_InputClient.Release();
+					CHECK(m_InputDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)&m_InputClient), "Unable to retrieve device audio client.", return NoError);
+					CHECK(m_InputClient->GetMixFormat(&_inWaveFormat), "Unable to retrieve device mix format.", return NoError);
+					double time = 4 * _bufferSize * (1.0 / _sampleRate) * 10000000;
+					CHECK(m_InputClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, time, 0, _inWaveFormat, nullptr), "Unable to initialize the output client", return NoError);
+					CHECK(m_InputClient->GetService(__uuidof(IAudioCaptureClient), (void**)&m_CaptureClient), "Unable to retrieve the render client.", return NoError);
+					
+					CHECK(m_InputClient->Start(), "Couldn't start the device", return NoError);
 					m_InputClient->GetBufferSize(&_inputFrameCount);
-					m_InputClient->Start();
 				}
 				
 				Pointer<WAVEFORMATEX> _outWaveFormat;
@@ -366,6 +383,19 @@ namespace Audijo
 					if (m_InputClient)
 					{
 						CHECK(m_CaptureClient->GetBuffer(&_deviceInputBuffer, &_inputFramesAvailable, &_inFlags, nullptr, nullptr), "Failed to get input buffer.", break);
+
+						for (int i = 0; i < _inputFramesAvailable; i++)
+						{
+							for (int j = 0; j < _nInChannels; j++)
+							{
+								((float*)_tempRingBuffer)[_tRingBufIndex] = ((float*)_deviceInputBuffer)[i * _nInChannels + j];
+
+								_tRingBufIndex++;
+							}
+
+							_tRingBufAvail++;
+						}
+						_inputFramesAvailable = _bufferSize * (_tRingBufAvail / _bufferSize);
 					}
 
 					if (m_OutputClient)
@@ -373,21 +403,40 @@ namespace Audijo
 						// See how much buffer space is available.
 						CHECK(m_OutputClient->GetCurrentPadding(&_framePadding), "Failed to get current frame padding", break);
 						_outputFramesAvailable = _outputFrameCount - _framePadding;
+						if (m_InputClient)
+							_framesAvailable = std::min(_inputFramesAvailable, _outputFramesAvailable);
+						else
+							_framesAvailable = _outputFramesAvailable;
 
-						_outputFramesAvailable = _bufferSize * (_outputFramesAvailable / _bufferSize);
+						_framesAvailable = _bufferSize * (_framesAvailable / _bufferSize);
 					
 						// Get the output buffer to fill
-						CHECK(m_RenderClient->GetBuffer(_outputFramesAvailable, &_deviceOutputBuffer), "Failed to get output buffer", break);
+						CHECK(m_RenderClient->GetBuffer(_framesAvailable, &_deviceOutputBuffer), "Failed to get output buffer", break);
 					}
+					else
+						_framesAvailable = _inputFramesAvailable;
 
-					float* _buffer = (float*)_deviceOutputBuffer;
+					_tRingBufAvail -= _framesAvailable;
 
-					for (int i = 0; i < _outputFramesAvailable / _bufferSize; i++)
+					for (int i = 0; i < _framesAvailable / _bufferSize; i++)
 					{
+						for (int c = 0; c < _nInChannels; c++)
+						{
+							for (int j = 0; j < _bufferSize; j++)
+							{
+								int _index = (_tRingBufRead + (j * _nInChannels + c)) % _tRingBufSize;
+								((float*)_tempInBuffer)[j] = ((float*)_tempRingBuffer)[_index];
+							}
+
+							ConvertBuffer(_inputs[c], _tempInBuffer, _bufferSize, _format, _inFormat);
+						}
+
+						_tRingBufRead = (_tRingBufRead + _bufferSize * _nInChannels) % _tRingBufSize;
+
 						m_Callback->Call((void**)_inputs, (void**)_outputs, CallbackInfo{
 							_nInChannels, _nOutChannels, _bufferSize, _sampleRate
 							}, m_UserData);
-					
+						
 						for (int c = 0; c < _nOutChannels; c++)
 						{
 							ConvertBuffer(_tempOutBuffer, _outputs[c], _bufferSize, _outFormat, _format);
@@ -395,14 +444,14 @@ namespace Audijo
 							{
 								//   index = frame * size of buffer          + index in buffer
 								int _index = i * _bufferSize * _nOutChannels + (j * _nOutChannels + c);
-								_buffer[_index] = ((float*)_tempOutBuffer)[j];
+								((float*)_deviceOutputBuffer)[_index] = ((float*)_tempOutBuffer)[j];
 							}
 						}
 					}
 
 					// Release buffers
 					if (m_InputClient) CHECK(m_CaptureClient->ReleaseBuffer(_inputFramesAvailable), "Failed to release the input buffer", break);
-					if (m_OutputClient) CHECK(m_RenderClient->ReleaseBuffer(_outputFramesAvailable, 0), "Failed to release the output buffer", break);
+					if (m_OutputClient) CHECK(m_RenderClient->ReleaseBuffer(_framesAvailable, 0), "Failed to release the output buffer", break);
 					//// Prepare the input buffer
 					//for (int i = 0; i < _nInChannels; i++)
 					//{
@@ -430,9 +479,10 @@ namespace Audijo
 				}
 				
 
+				delete[] _tempInBuffer;
 				delete[] _tempOutBuffer;
-			//}
-		//};
+			}
+		};
 
 		return NoError;
 	};
