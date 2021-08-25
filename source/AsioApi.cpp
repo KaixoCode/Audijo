@@ -241,7 +241,10 @@ namespace Audijo
 			{
 			case ASIOSTInt16MSB: m_Settings.m_InByteSwap = true;
 			case ASIOSTInt16LSB: m_Settings.m_DeviceInFormat = Int16;
-				break;			
+				break;		
+			case ASIOSTInt24MSB:
+			case ASIOSTInt24LSB:
+				return UnsupportedSampleFormat;
 			case ASIOSTInt32MSB: m_Settings.m_InByteSwap = true;
 			case ASIOSTInt32LSB: m_Settings.m_DeviceInFormat = Int32;
 				break;			
@@ -271,7 +274,10 @@ namespace Audijo
 			{
 			case ASIOSTInt16MSB: m_Settings.m_OutByteSwap = true;
 			case ASIOSTInt16LSB: m_Settings.m_DeviceOutFormat = Int16;
-				break;
+				break;			
+			case ASIOSTInt24MSB: 
+			case ASIOSTInt24LSB: 
+				return UnsupportedSampleFormat;
 			case ASIOSTInt32MSB: m_Settings.m_OutByteSwap = true;
 			case ASIOSTInt32LSB: m_Settings.m_DeviceOutFormat = Int32;
 				break;

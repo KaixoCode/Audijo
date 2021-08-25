@@ -2,12 +2,6 @@
 
 namespace Audijo
 {
-	#define SAFE_RELEASE( objectPtr )\
-	if ( objectPtr )\
-	{\
-	  objectPtr->Release();\
-	  objectPtr = nullptr;\
-	}
 
 #define CHECK(x, msg, type) if (FAILED(x)) { LOGL(msg); type; }
 
@@ -15,7 +9,8 @@ namespace Audijo
 		: ApiBase()
 	{
 		// WASAPI can run either apartment or multi-threaded
-		HRESULT hr = CoInitialize(nullptr);
+		HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+		
 		if (!FAILED(hr))
 			m_CoInitialized = true;
 
@@ -175,6 +170,12 @@ namespace Audijo
 
 			if (m_Settings.output.deviceId != NoDevice && m_Settings.output.channels <= -1)
 				m_Settings.output.channels = m_Devices[m_Settings.output.deviceId].outputChannels;
+
+			if (m_Settings.input.deviceId == NoDevice)
+				m_Settings.input.channels = 0;
+
+			if (m_Settings.output.deviceId == NoDevice)
+				m_Settings.output.channels = 0;
 		}
 
 		// Retrieve necessary settings;
@@ -196,11 +197,11 @@ namespace Audijo
 			CHECK(m_InputDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)&m_InputClient), "Unable to retrieve device audio client.", return Fail);
 			CHECK(m_InputClient->GetMixFormat(&_inFormat), "Unable to retrieve device mix format.", return Fail);
 			CHECK(m_InputClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 10000000, 0, _inFormat, nullptr), "Unable to initialize the input client", return Fail);
-			CHECK(m_InputClient->GetService(__uuidof(IAudioRenderClient), (void**)&m_CaptureClient), "Unable to retrieve the capture client.", return Fail);
+			CHECK(m_InputClient->GetService(__uuidof(IAudioCaptureClient), (void**)&m_CaptureClient), "Unable to retrieve the capture client.", return Fail);
 			
 			// If no samplerate, set to supported samplerate
 			if (_sampleRate == -1)
-				_sampleRate = _inFormat->nSamplesPerSec;
+				m_Settings.sampleRate = _sampleRate = _inFormat->nSamplesPerSec;
 
 			// Otherwise check samplerate
 			else if (_inFormat->nSamplesPerSec != _sampleRate)
@@ -234,16 +235,13 @@ namespace Audijo
 			Pointer<WAVEFORMATEX> _outFormat;
 			m_OutputDevice.Release();
 			m_OutputClient.Release();
-			m_RenderClient.Release();
 			CHECK(m_WasapiDevices->Item(_outDeviceId, &m_OutputDevice), "Unable to retrieve device handle.", return NotPresent);
 			CHECK(m_OutputDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)&m_OutputClient), "Unable to retrieve device audio client.", return Fail);
 			CHECK(m_OutputClient->GetMixFormat(&_outFormat), "Unable to retrieve device mix format.", return Fail);
-			CHECK(m_OutputClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 10000000, 0, _outFormat, nullptr), "Unable to initialize the output client", return Fail);
-			CHECK(m_OutputClient->GetService(__uuidof(IAudioRenderClient), (void**)&m_RenderClient), "Unable to retrieve the render client.", return Fail);
-
+	
 			// If no samplerate, set to supported samplerate
 			if (_sampleRate == -1)
-				_sampleRate = _outFormat->nSamplesPerSec;
+				m_Settings.sampleRate = _sampleRate = _outFormat->nSamplesPerSec;
 
 			// If invalid samplerate and was valid for input device, it's invalid duplex because no support for resampling.
 			if (_outFormat->nSamplesPerSec != _sampleRate)
@@ -271,10 +269,28 @@ namespace Audijo
 					m_Settings.m_DeviceOutFormat = Int32;
 			}
 		}
-		// TODO check if all settings are correct
 
+		// If callback has been set, deduce format type
+		if (m_Callback)
+		{
+			int bytes = m_Callback->Bytes();
+			bool floating = m_Callback->Floating();
 
-		// TODO open stream
+			if (floating)
+				m_Settings.m_Format = bytes == 4 ? Float32 : Float64;
+			else
+				m_Settings.m_Format = bytes == 1 ? Int8 : bytes == 2 ? Int16 : Int32;
+		}
+		else
+		{
+			LOGL("Failed to deduce sample format, no callback was set.");
+			return NoCallback;
+		}
+
+		// Allocate the user callback buffers
+		AllocateBuffers();
+
+		m_State = Prepared;
 		return NoError;
 	}
 
@@ -287,8 +303,138 @@ namespace Audijo
 			return AlreadyRunning;
 
 		// TODO Start stream
-
 		m_State = Running;
+		/*m_AudioThread = std::thread{ [this]()
+			{*/
+				//CHECK(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED), "Failed to CoInitialize thread.", return NoError);
+
+				// Retrieve information from object
+				int _nInChannels = m_Settings.input.channels;
+				int _nOutChannels = m_Settings.output.channels;
+				int _bufferSize = m_Settings.bufferSize;
+				auto _sampleRate = m_Settings.sampleRate;
+				auto _inFormat = m_Settings.m_DeviceInFormat;
+				bool _inSwap = m_Settings.m_InByteSwap;
+				auto _outFormat = m_Settings.m_DeviceOutFormat;
+				bool _outSwap = m_Settings.m_OutByteSwap;
+				auto _format = m_Settings.m_Format;
+				char** _inputs = m_InputBuffers;
+				char** _outputs = m_OutputBuffers;
+
+				auto _renderEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+				// Output buffer is buffersize * bytes in out format
+				char* _tempOutBuffer = new char[_bufferSize * (_outFormat & 0xF)];
+
+				unsigned int _inputFrameCount = 0;
+				unsigned int _inputFramesAvailable = 0;
+				unsigned int _outputFrameCount = 0;
+				unsigned int _outputFramesAvailable = 0;
+				unsigned int _framePadding = 0;
+				DWORD _inFlags = 0;
+				DWORD _outFlags = 0;
+				BYTE* _deviceInputBuffer = nullptr;
+				BYTE* _deviceOutputBuffer = nullptr;
+				if (m_InputClient)
+				{
+					m_InputClient->GetBufferSize(&_inputFrameCount);
+					m_InputClient->Start();
+				}
+				
+				Pointer<WAVEFORMATEX> _outWaveFormat;
+				if (m_OutputClient)
+				{
+					m_RenderClient.Release();
+					m_OutputClient.Release();
+					CHECK(m_OutputDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)&m_OutputClient), "Unable to retrieve device audio client.", return NoError);
+					CHECK(m_OutputClient->GetMixFormat(&_outWaveFormat), "Unable to retrieve device mix format.", return NoError);
+					double time = 4 * _bufferSize * (1.0 / _sampleRate) * 10000000;
+					CHECK(m_OutputClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, _outWaveFormat, nullptr), "Unable to initialize the output client", return NoError);
+					CHECK(m_OutputClient->GetService(__uuidof(IAudioRenderClient), (void**)&m_RenderClient), "Unable to retrieve the render client.", return NoError);
+					m_OutputClient->SetEventHandle(_renderEvent);
+
+					m_OutputClient->Start();
+					m_OutputClient->GetBufferSize(&_outputFrameCount);					
+				}
+				
+				while (m_State == Running)
+				{
+					WaitForSingleObject(_renderEvent, INFINITE);
+
+					// Get the input buffer + nmr of available frames.
+					if (m_InputClient)
+					{
+						CHECK(m_CaptureClient->GetBuffer(&_deviceInputBuffer, &_inputFramesAvailable, &_inFlags, nullptr, nullptr), "Failed to get input buffer.", break);
+					}
+
+					if (m_OutputClient)
+					{
+
+						m_OutputClient->GetBufferSize(&_outputFrameCount);
+
+						// See how much buffer space is available.
+						CHECK(m_OutputClient->GetCurrentPadding(&_framePadding), "Failed to get current frame padding", break);
+						_outputFramesAvailable = _outputFrameCount - _framePadding;
+					
+						// Get the output buffer to fill
+						CHECK(m_RenderClient->GetBuffer(_outputFramesAvailable, &_deviceOutputBuffer), "Failed to get output buffer", break);
+					}
+
+					//for (int i = 0; i < _outputFramesAvailable / _bufferSize; i++)
+					//{
+					//	m_Callback->Call((void**)_inputs, (void**)_outputs, CallbackInfo{
+					//		_nInChannels, _nOutChannels, _bufferSize, _sampleRate
+					//		}, m_UserData);
+					//
+					//	for (int c = 0; c < _nOutChannels; c++)
+					//	{
+					//		ConvertBuffer(_tempOutBuffer, _outputs[c], _bufferSize, _outFormat, _format);
+					//		for (int j = 0; j < _bufferSize * (_outFormat & 0xF); j++)
+					//		{
+					//			//   index = frame * size of buffer          + index in buffer
+					//			int _index = i * _bufferSize * (_outFormat & 0xF) * _nOutChannels + (j * _nOutChannels + c);
+					//			_deviceOutputBuffer[_index] = _tempOutBuffer[j];
+					//		}
+					//	}
+					//}
+
+					for (int i = 0; i < _outputFramesAvailable * _nOutChannels * (_outFormat & 0xF); i++)
+						_deviceOutputBuffer[i] = (std::rand() * 10000) * 0.00001 * 0.3;
+
+					// Release buffers
+					if (m_InputClient) CHECK(m_CaptureClient->ReleaseBuffer(_inputFramesAvailable), "Failed to release the input buffer", break);
+					CHECK(m_RenderClient->ReleaseBuffer(_outputFramesAvailable, 0), "Failed to release the output buffer", break);
+					//// Prepare the input buffer
+					//for (int i = 0; i < _nInChannels; i++)
+					//{
+					//	int index = 
+					//	char* _temp = (char*)m_BufferInfos[i].buffers[doubleBufferIndex];
+					//	if (_inSwap)
+					//		m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _inFormat);
+					//	m_AsioApi->ConvertBuffer(_inputs[i], _temp, _bufferSize, _inFormat, _format);
+					//}
+
+					//// usercallback
+					//m_AsioApi->m_Callback->Call((void**)_inputs, (void**)_outputs, CallbackInfo{
+					//	_nInChannels, _nOutChannels, _bufferSize, _sampleRate
+					//	}, m_AsioApi->m_UserData);
+
+					//// Convert the output buffer
+					//for (int i = 0; i < _nOutChannels; i++)
+					//{
+					//	char* _temp = (char*)m_BufferInfos[i + _nOutChannels].buffers[doubleBufferIndex];
+					//	m_AsioApi->ConvertBuffer(_temp, _outputs[i], _bufferSize, _outFormat, _format);
+					//	if (_outSwap)
+					//		m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _outFormat);
+					//}
+
+				}
+				
+
+				delete[] _tempOutBuffer;
+			//}
+		//};
+
 		return NoError;
 	};
 
@@ -300,9 +446,15 @@ namespace Audijo
 		if (m_State == Prepared)
 			return NotRunning;
 
-		// TODO stop stream
-
 		m_State = Prepared;
+		try
+		{
+			m_AudioThread.join();
+		}
+		catch (const std::system_error& e)
+		{
+			LOGL(e.what());
+		}
 		return NoError;
 	};
 
@@ -313,10 +465,8 @@ namespace Audijo
 
 		if (m_State == Running)
 		{
-			// TODO stop stream
+			StopStream();
 		}
-
-		// TODO close stream
 
 		m_State = Loaded;
 	};

@@ -13,7 +13,7 @@ int main()
 	//			for (int j = 0; j < info.outputChannels; j++)
 	//				output[j][i] = std::sin(_counter * 0.01) * 0.5;
 	//	});
-
+	
 	//StreamSettings _settings;
 	//_settings.bufferSize = 256;
 	//_settings.sampleRate = 44100;
@@ -38,6 +38,13 @@ int main()
 			LOG(i << ", ");
 		LOGL("");
 	}
+	_stream.SetCallback([&](float** input, float** output, CallbackInfo info)
+		{   // generate a simple sinewave
+			static int _counter = 0;
+			for (int i = 0; i < info.bufferSize; i++, _counter++)
+				for (int j = 0; j < info.outputChannels; j++)
+					output[j][i] = std::sin(_counter * 0.01) * 0.5;
+		});
 
 	StreamSettings _settings;
 	_settings.bufferSize = 256;
@@ -45,4 +52,5 @@ int main()
 	_stream.OpenStream(_settings);
 	_stream.StartStream();
 
+	while (true);
 }

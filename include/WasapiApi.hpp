@@ -39,7 +39,7 @@ namespace Audijo
 			T** operator&() { return &ptr; }
 			T* get() { return ptr; }
 			operator T*() { return ptr; }
-			operator bool() { return ptr; };
+			operator bool() { return ptr != nullptr; };
 		
 		private:
 			T* ptr;
@@ -66,6 +66,9 @@ namespace Audijo
 		Pointer<IAudioClient> m_OutputClient; // General client for output
 		Pointer<IAudioCaptureClient> m_CaptureClient; // Input client
 		Pointer<IAudioRenderClient> m_RenderClient;   // Output client
+
+		std::thread m_AudioThread;
+
 		State m_State = Loaded;
 	};
 }

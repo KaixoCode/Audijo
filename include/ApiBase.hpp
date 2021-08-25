@@ -6,7 +6,12 @@ namespace Audijo
 {
 	enum SampleFormat 
 	{
-		None, Int8, Int16, Int32, Float32, Float64
+		None,  // Float  Bytes
+		Int8    = 0x00 | 0x01,
+		Int16   = 0x00 | 0x02,
+		Int32   = 0x00 | 0x04,
+		Float32 = 0x10 | 0x04,
+		Float64 = 0x10 | 0x08
 	};
 
 	struct DeviceInfo 
