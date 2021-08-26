@@ -5,8 +5,7 @@ using namespace Audijo;
 int main()
 {
 
-	Stream _stream;
-	_stream.Api(Asio);
+	Stream _stream{ Wasapi };
 	_stream.SetCallback([&](float** input, float** output, CallbackInfo info)
 		{   // generate a simple sinewave
 			static int _counter = 0;
