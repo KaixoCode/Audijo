@@ -48,7 +48,6 @@ int main()
 
 	StreamSettings _settings;
 	_settings.bufferSize = 256;
-	_settings.sampleRate = 48000;
 	_settings.input.deviceId = DefaultDevice;
 	_settings.output.deviceId = DefaultDevice;
 	_stream.OpenStream(_settings);
