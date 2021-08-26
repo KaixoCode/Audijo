@@ -23,6 +23,9 @@ namespace Audijo
 			Api(api);
 		}
 
+		/**
+		 * Constructor
+		 */
 		Stream()
 		{}
 
@@ -44,7 +47,7 @@ namespace Audijo
 		template<typename ...Args> requires ValidCallback<int, Args...>
 		void SetCallback(Callback<Args...> callback)
 		{
-			m_Api->SetCallback(std::make_unique<CallbackWrapper<Callback<Args...>, int(Args...)>>(callback));
+			if (m_Api) m_Api->SetCallback(std::make_unique<CallbackWrapper<Callback<Args...>, int(Args...)>>(callback));
 		};
 
 		/**
@@ -58,7 +61,7 @@ namespace Audijo
 		template<typename Lambda> requires LambdaConstraint<Lambda>
 		void SetCallback(Lambda callback)
 		{
-			m_Api->SetCallback(std::make_unique<CallbackWrapper<Lambda, typename LambdaSignature<Lambda>::type>>(callback));
+			if (m_Api) m_Api->SetCallback(std::make_unique<CallbackWrapper<Lambda, typename LambdaSignature<Lambda>::type>>(callback));
 		};
 
 		/**
@@ -67,6 +70,7 @@ namespace Audijo
 		 * @param settings <code>StreamSettings</code>
 		 * @return 
 		 * AlreadyOpen - If the stream is already opened<br>
+		 * NoApi - If no Api was specified<br>
 		 * InvalidDuplex - If the combination of input and output devices is invalid<br>
 		 * Fail - If the device failed to open<br>
 		 * NotPresent - If the input/output is not present<br>
@@ -76,7 +80,7 @@ namespace Audijo
 		 * InvalidBufferSize - If the buffer size is not supported<br>
 		 * NoError - If stream started successfully
 		 */
-		Error OpenStream(const StreamParameters& settings = StreamParameters{}) { return m_Api->OpenStream(settings); };
+		Error OpenStream(const StreamParameters& settings = StreamParameters{}) { return !m_Api ? NoApi : m_Api->OpenStream(settings); };
 
 		/**
 		 * Starts the flow of audio through the opened stream. Does nothing
@@ -87,7 +91,7 @@ namespace Audijo
 		 * Fail - If device failed to start<br>
 		 * NoError - If stream started successfully
 		 */
-		Error StartStream() { return m_Api->StartStream(); };
+		Error StartStream() { return !m_Api ? NoApi : m_Api->StartStream(); };
 
 		/**
 		 * Stop the flow of audio through the stream. Does nothing if the
@@ -98,7 +102,7 @@ namespace Audijo
 		 * Fail - If device failed to stop<br>
 		 * NoError - If stream stopped successfully
 		 */
-		Error StopStream() { return m_Api->StopStream(); };
+		Error StopStream() { return !m_Api ? NoApi : m_Api->StopStream(); };
 
 		/**
 		 * Close the stream. Also stops the stream if it hasn't been stopped yet.
@@ -108,14 +112,14 @@ namespace Audijo
 		 * Fail - If device failed to close<br>
 		 * NoError - If stream stopped successfully
 		 */
-		Error CloseStream() { return m_Api->CloseStream(); };
+		Error CloseStream() { return !m_Api ? NoApi : m_Api->CloseStream(); };
 
 		/**
 		 * Set the userdata
 		 * @param data userdata
 		 */
 		template<typename T>
-		void UserData(T& data) { m_Api->UserData(data); };
+		void UserData(T& data) { if (m_Api) m_Api->UserData(data); };
 
 		/**
 		 * Get this Stream object as a specific api, to expose api specific functions.
@@ -127,7 +131,7 @@ namespace Audijo
 		 * Set the api.
 		 * @param api api
 		 */
-		void Api(Api api)
+		virtual void Api(Api api)
 		{
 			switch (api)
 			{
@@ -138,7 +142,7 @@ namespace Audijo
 		}
 
 	protected:
-		std::unique_ptr<ApiBase> m_Api;
+		std::unique_ptr<ApiBase> m_Api = nullptr;
 	};
 
 	/**
@@ -148,6 +152,9 @@ namespace Audijo
 	template<>
 	class Stream<Wasapi> : public Stream<>
 	{
+		// Delete the api method
+		void Api(Audijo::Api api) override {};
+
 	public:
 		Stream()
 			: Stream<>(Wasapi)
@@ -174,6 +181,9 @@ namespace Audijo
 	template<>
 	class Stream<Asio> : public Stream<>
 	{
+		// Delete the api method
+		void Api(Audijo::Api api) override {};
+	
 	public:
 		Stream()
 			: Stream<>(Asio)

@@ -152,22 +152,22 @@ namespace Audijo
 		m_Parameters = settings;
 
 		// Check device ids
-		{
-			if (m_Parameters.input == Default)
-				for (auto& i : m_Devices)
-					if (i.defaultDevice && i.inputChannels > 0)
-						m_Parameters.input = i.id;
-			if (m_Parameters.output == Default)
-				for (auto& i : m_Devices)
-					if (i.defaultDevice && i.outputChannels > 0)
-						m_Parameters.output = i.id;
-		}
-
+		if (m_Parameters.input == Default)
+			for (auto& i : m_Devices)
+				if (i.defaultDevice && i.inputChannels > 0)
+					m_Parameters.input = i.id;
+		if (m_Parameters.output == Default)
+			for (auto& i : m_Devices)
+				if (i.defaultDevice && i.outputChannels > 0)
+					m_Parameters.output = i.id;
+		
 		// Set channel count
-		{
-			m_Information.inputChannels = m_Parameters.input == NoDevice ? 0 : m_Devices[m_Parameters.input].inputChannels;
-			m_Information.outputChannels = m_Parameters.output == NoDevice ? 0 : m_Devices[m_Parameters.output].outputChannels;
-		}
+		m_Information.inputChannels = m_Parameters.input == NoDevice ? 0 : m_Devices[m_Parameters.input].inputChannels;
+		m_Information.outputChannels = m_Parameters.output == NoDevice ? 0 : m_Devices[m_Parameters.output].outputChannels;
+
+		// Default buffersize is 256 because why not lol
+		if (m_Parameters.bufferSize == Default)
+			m_Parameters.bufferSize = 256;
 
 		// Retrieve necessary settings;
 		int _inDeviceId = m_Parameters.input;

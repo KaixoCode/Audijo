@@ -2,35 +2,11 @@
 
 using namespace Audijo;
 
-/*
-
-	Device information
-	 - Name
-	 - Id
-	 - Input Channels
-	 - Output Channels
-	 - Sample Rates
-
-
-
-	 StreamSettings
-	  - input device
-	  - output device
-	  - sample rate
-	  - buffer size
-
-
-
-
-
-*/
-
-
 int main()
 {
 
 	Stream _stream;
-	_stream.Api(Wasapi);
+	_stream.Api(Asio);
 	_stream.SetCallback([&](float** input, float** output, CallbackInfo info)
 		{   // generate a simple sinewave
 			static int _counter = 0;
@@ -39,7 +15,7 @@ int main()
 					output[j][i] = std::sin(_counter * 0.01) * 0.5;
 		});
 
-	_stream.OpenStream({ .input = NoDevice, .output = Default, .bufferSize = 256, .sampleRate = Default });
+	_stream.OpenStream({ .input = NoDevice, .output = Default, .bufferSize = Default, .sampleRate = Default });
 	_stream.StartStream();
 	while (true);
 	

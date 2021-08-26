@@ -117,6 +117,7 @@ namespace Audijo
 		
 		NoMemory,   // Failed to allocate memory
 		NotPresent, // Device is not present
+		NoApi,      // No Api was specified
 
 		InvalidSampleRate, // Device does not support sample rate
 		InvalidBufferSize, // Device does not support buffer size

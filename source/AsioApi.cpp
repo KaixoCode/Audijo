@@ -329,6 +329,15 @@ namespace Audijo
 
 		// Create the buffer
 		{
+
+			// Find prefered buffer size of device
+			if (m_Parameters.bufferSize == Default)
+			{
+				long a, b, _prefered, d;
+				ASIOGetBufferSize(&a, &b, &_prefered, &d);
+				m_Parameters.bufferSize = _bufferSize = _prefered;
+			}
+
 			// First clean up any previous buffer infos
 			if (m_BufferInfos)
 				delete[] m_BufferInfos;
