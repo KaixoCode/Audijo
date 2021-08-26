@@ -24,7 +24,7 @@ namespace Audijo
 		Devices();
 	}
 
-	const std::vector<DeviceInfo>& WasapiApi::Devices()
+	const std::vector<DeviceInfo<Wasapi>>& WasapiApi::Devices()
 	{
 		// Make a list of all numbers from 0 to amount of current devices
 		// this is used to determine if we need to delete devices from the list after querying.
@@ -125,7 +125,6 @@ namespace Audijo
 					_device.outputChannels = _out;
 					_device.sampleRates = _srates;
 					_device.defaultDevice = _default;
-					_device.sampleFormat = _format->wBitsPerSample ;
 
 					// Erase from the toDelete, since we've still found the device!
 					_toDelete.erase(std::find(_toDelete.begin(), _toDelete.end(), _index));
@@ -135,7 +134,7 @@ namespace Audijo
 			}
 
 			if (!_found)
-				m_Devices.push_back(DeviceInfo{ i, _name, _in, _out, _srates, _default });
+				m_Devices.push_back(DeviceInfo<Wasapi>{ { i, _name, _in, _out, _srates, _default, Wasapi } });
 		}
 
 		// Delete all devices we couldn't find again.
@@ -145,49 +144,39 @@ namespace Audijo
 		return m_Devices;
 	}
 
-	Error WasapiApi::OpenStream(const StreamSettings& settings)
+	Error WasapiApi::OpenStream(const StreamParameters& settings)
 	{
 		if (m_State != Loaded)
 			return AlreadyOpen;
 
-		m_Settings = settings;
+		m_Parameters = settings;
 
 		// Check device ids
 		{
-			if (m_Settings.input.deviceId == DefaultDevice)
+			if (m_Parameters.input == Default)
 				for (auto& i : m_Devices)
 					if (i.defaultDevice && i.inputChannels > 0)
-						m_Settings.input.deviceId = i.id;
-			if (m_Settings.output.deviceId == DefaultDevice)
+						m_Parameters.input = i.id;
+			if (m_Parameters.output == Default)
 				for (auto& i : m_Devices)
 					if (i.defaultDevice && i.outputChannels > 0)
-						m_Settings.output.deviceId = i.id;
+						m_Parameters.output = i.id;
 		}
 
-		// Set default channel count
+		// Set channel count
 		{
-			// If nmr of channels is not set, set it to max
-			if (m_Settings.input.deviceId != NoDevice && m_Settings.input.channels <= -1)
-				m_Settings.input.channels = m_Devices[m_Settings.input.deviceId].inputChannels;
-
-			if (m_Settings.output.deviceId != NoDevice && m_Settings.output.channels <= -1)
-				m_Settings.output.channels = m_Devices[m_Settings.output.deviceId].outputChannels;
-
-			if (m_Settings.input.deviceId == NoDevice)
-				m_Settings.input.channels = 0;
-
-			if (m_Settings.output.deviceId == NoDevice)
-				m_Settings.output.channels = 0;
+			m_Information.inputChannels = m_Parameters.input == NoDevice ? 0 : m_Devices[m_Parameters.input].inputChannels;
+			m_Information.outputChannels = m_Parameters.output == NoDevice ? 0 : m_Devices[m_Parameters.output].outputChannels;
 		}
 
 		// Retrieve necessary settings;
-		int _inDeviceId = m_Settings.input.deviceId;
-		int _outDeviceId = m_Settings.output.deviceId;
-		int _nInChannels = m_Settings.input.channels;
-		int _nOutChannels = m_Settings.output.channels;
+		int _inDeviceId = m_Parameters.input;
+		int _outDeviceId = m_Parameters.output;
+		int _nInChannels = m_Information.inputChannels;
+		int _nOutChannels = m_Information.outputChannels;
 		int _nChannels = _nInChannels + _nOutChannels;
-		int _bufferSize = m_Settings.bufferSize;
-		int _sampleRate = m_Settings.sampleRate;
+		int _bufferSize = m_Parameters.bufferSize;
+		int _sampleRate = m_Parameters.sampleRate;
 
 		if (_inDeviceId != NoDevice)
 		{
@@ -203,7 +192,7 @@ namespace Audijo
 			
 			// If no samplerate, set to supported samplerate
 			if (_sampleRate == -1)
-				m_Settings.sampleRate = _sampleRate = _inFormat->nSamplesPerSec;
+				m_Parameters.sampleRate = _sampleRate = _inFormat->nSamplesPerSec;
 
 			// Otherwise check samplerate
 			else if (_inFormat->nSamplesPerSec != _sampleRate)
@@ -217,21 +206,21 @@ namespace Audijo
 				((WAVEFORMATEXTENSIBLE*)_inFormat.get())->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT))
 			{
 				if (_inFormat->wBitsPerSample == 32)
-					m_Settings.m_DeviceInFormat = Float32;
+					m_Information.deviceInFormat = Float32;
 				else if (_inFormat->wBitsPerSample == 64)
-					m_Settings.m_DeviceInFormat = Float64;
+					m_Information.deviceInFormat = Float64;
 			}
 			else if (_inFormat->wFormatTag == WAVE_FORMAT_PCM || (_inFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
 				((WAVEFORMATEXTENSIBLE*)_inFormat.get())->SubFormat == KSDATAFORMAT_SUBTYPE_PCM))
 			{
 				if (_inFormat->wBitsPerSample == 8)
-					m_Settings.m_DeviceInFormat = Int8;
+					m_Information.deviceInFormat = Int8;
 				else if (_inFormat->wBitsPerSample == 16)
-					m_Settings.m_DeviceInFormat = Int16;
+					m_Information.deviceInFormat = Int16;
 				else if (_inFormat->wBitsPerSample == 24)
 					return UnsupportedSampleFormat;
 				else if (_inFormat->wBitsPerSample == 32)
-					m_Settings.m_DeviceInFormat = Int32;
+					m_Information.deviceInFormat = Int32;
 			}
 		}
 
@@ -246,7 +235,7 @@ namespace Audijo
 	
 			// If no samplerate, set to supported samplerate
 			if (_sampleRate == -1)
-				m_Settings.sampleRate = _sampleRate = _outFormat->nSamplesPerSec;
+				m_Parameters.sampleRate = _sampleRate = _outFormat->nSamplesPerSec;
 
 			// If invalid samplerate and was valid for input device, it's invalid duplex because no support for resampling.
 			if (_outFormat->nSamplesPerSec != _sampleRate)
@@ -260,34 +249,29 @@ namespace Audijo
 				((WAVEFORMATEXTENSIBLE*)_outFormat.get())->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT))
 			{
 				if (_outFormat->wBitsPerSample == 32)
-					m_Settings.m_DeviceOutFormat = Float32;
+					m_Information.deviceOutFormat = Float32;
 				else if (_outFormat->wBitsPerSample == 64)
-					m_Settings.m_DeviceOutFormat = Float64;
+					m_Information.deviceOutFormat = Float64;
 			}
 			else if (_outFormat->wFormatTag == WAVE_FORMAT_PCM || (_outFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
 				((WAVEFORMATEXTENSIBLE*)_outFormat.get())->SubFormat == KSDATAFORMAT_SUBTYPE_PCM))
 			{
 				if (_outFormat->wBitsPerSample == 8)
-					m_Settings.m_DeviceOutFormat = Int8;
+					m_Information.deviceOutFormat = Int8;
 				else if (_outFormat->wBitsPerSample == 16)
-					m_Settings.m_DeviceOutFormat = Int16;
+					m_Information.deviceOutFormat = Int16;
 				else if (_outFormat->wBitsPerSample == 24)
 					return UnsupportedSampleFormat;
 				else if (_outFormat->wBitsPerSample == 32)
-					m_Settings.m_DeviceOutFormat = Int32;
+					m_Information.deviceOutFormat = Int32;
 			}
 		}
 
 		// If callback has been set, deduce format type
 		if (m_Callback)
 		{
-			int bytes = m_Callback->Bytes();
-			bool floating = m_Callback->Floating();
-
-			if (floating)
-				m_Settings.m_Format = bytes == 4 ? Float32 : Float64;
-			else
-				m_Settings.m_Format = bytes == 1 ? Int8 : bytes == 2 ? Int16 : Int32;
+			m_Information.inFormat = (SampleFormat)m_Callback->InFormat();
+			m_Information.outFormat = (SampleFormat)m_Callback->OutFormat();
 		}
 		else
 		{
@@ -325,13 +309,14 @@ namespace Audijo
 					FreeLibrary(AvrtDll);
 				}
 
-				int _nInChannels = m_Settings.input.channels;
-				int _nOutChannels = m_Settings.output.channels;
-				int _bufferSize = m_Settings.bufferSize;
-				auto _sampleRate = m_Settings.sampleRate;
-				auto _inFormat = m_Settings.m_DeviceInFormat;
-				auto _outFormat = m_Settings.m_DeviceOutFormat;
-				auto _format = m_Settings.m_Format;
+				int _nInChannels = m_Information.inputChannels;
+				int _nOutChannels = m_Information.outputChannels;
+				int _bufferSize = m_Parameters.bufferSize;
+				auto _sampleRate = m_Parameters.sampleRate;
+				auto _deviceInFormat = m_Information.deviceInFormat;
+				auto _deviceOutFormat = m_Information.deviceOutFormat;
+				auto _inFormat = m_Information.inFormat;
+				auto _outFormat = m_Information.outFormat;
 				char** _inputs = m_InputBuffers;
 				char** _outputs = m_OutputBuffers;
 
@@ -378,17 +363,17 @@ namespace Audijo
 				}
 
 				// Create ring buffers
-				RingBuffer<char> _inRingBuffer{ (_bufferSize + _inputFramesAvailable) * _nInChannels * FormatBytes(_inFormat) };
-				RingBuffer<char> _outRingBuffer{ (_bufferSize + _outputFramesAvailable) * _nOutChannels * FormatBytes(_outFormat) };
+				RingBuffer<char> _inRingBuffer{ (_bufferSize + _inputFramesAvailable) * _nInChannels * FormatBytes(_deviceInFormat) };
+				RingBuffer<char> _outRingBuffer{ (_bufferSize + _outputFramesAvailable) * _nOutChannels * FormatBytes(_deviceOutFormat) };
 
 				// Create temporary buffers
 				char** _tempInBuff = new char* [_nInChannels];
 				for (int i = 0; i < _nInChannels; i++)
-					_tempInBuff[i] = new char[_bufferSize * FormatBytes(_inFormat)];
+					_tempInBuff[i] = new char[_bufferSize * FormatBytes(_deviceInFormat)];
 
 				char** _tempOutBuff = new char* [_nOutChannels];
 				for (int i = 0; i < _nOutChannels; i++)
-					_tempOutBuff[i] = new char[_bufferSize * FormatBytes(_outFormat)];
+					_tempOutBuff[i] = new char[_bufferSize * FormatBytes(_deviceOutFormat)];
 
 				// Start loop
 				while (m_State == Running)
@@ -400,17 +385,17 @@ namespace Audijo
 						if (m_InputClient)
 						{
 							// Only pull if the ring buffer contains enough samples to fill the user buffer
-							if (_inRingBuffer.Size() >= _bufferSize * _nInChannels * FormatBytes(_inFormat))
+							if (_inRingBuffer.Size() >= _bufferSize * _nInChannels * FormatBytes(_deviceInFormat))
 							{
 								// Get samples from ring buffer
 								for (int i = 0; i < _bufferSize; i++)
 									for (int j = 0; j < _nInChannels; j++)
-										for (int k = 0; k < FormatBytes(_inFormat); k++)
-											_tempInBuff[j][i * FormatBytes(_inFormat) + k] = _inRingBuffer.Dequeue();
+										for (int k = 0; k < FormatBytes(_deviceInFormat); k++)
+											_tempInBuff[j][i * FormatBytes(_deviceInFormat) + k] = _inRingBuffer.Dequeue();
 
 								// Convert to the right format
 								for (int j = 0; j < _nInChannels; j++)
-									ConvertBuffer(_inputs[j], _tempInBuff[j], _bufferSize, _format, _inFormat);
+									ConvertBuffer(_inputs[j], _tempInBuff[j], _bufferSize, _inFormat, _deviceInFormat);
 
 								_pulled = true;
 							}
@@ -429,17 +414,17 @@ namespace Audijo
 					// If we've pull, it means the callback was called, so we need to handle the user output buffer
 					if (m_OutputClient && _pulled)
 					{
-						if (_outRingBuffer.Space() >= _bufferSize * _nOutChannels * FormatBytes(_outFormat))
+						if (_outRingBuffer.Space() >= _bufferSize * _nOutChannels * FormatBytes(_deviceOutFormat))
 						{
 							// First convert to the right format
 							for (int j = 0; j < _nOutChannels; j++)
-								ConvertBuffer(_tempOutBuff[j], _outputs[j], _bufferSize, _outFormat, _format);
+								ConvertBuffer(_tempOutBuff[j], _outputs[j], _bufferSize, _deviceOutFormat, _outFormat);
 
 							// Then add it to the output ring buffer
 							for (int i = 0; i < _bufferSize; i++)
 								for (int j = 0; j < _nOutChannels; j++)
-									for (int k = 0; k < FormatBytes(_outFormat); k++)
-										_outRingBuffer.Enqueue(_tempOutBuff[j][i * FormatBytes(_outFormat) + k]);
+									for (int k = 0; k < FormatBytes(_deviceOutFormat); k++)
+										_outRingBuffer.Enqueue(_tempOutBuff[j][i * FormatBytes(_deviceOutFormat) + k]);
 
 							_pushed = true;
 						}
@@ -461,10 +446,10 @@ namespace Audijo
 						CHECK(m_CaptureClient->GetBuffer(&_streamBuffer, &_inputFramesAvailable, &_flags, nullptr, nullptr), "Failed to retrieve input buffer.", goto Cleanup);
 
 						// If there is enough space in the input ring buffer, we'll enqueue it.
-						if (_inRingBuffer.Space() >= _inputFramesAvailable * _nInChannels * FormatBytes(_inFormat))
+						if (_inRingBuffer.Space() >= _inputFramesAvailable * _nInChannels * FormatBytes(_deviceInFormat))
 						{
 							// Add the input data to the input ring buffer
-							for (int i = 0; i < _inputFramesAvailable * _nInChannels * FormatBytes(_inFormat); i++)
+							for (int i = 0; i < _inputFramesAvailable * _nInChannels * FormatBytes(_deviceInFormat); i++)
 								_inRingBuffer.Enqueue(_streamBuffer[i]);
 
 							CHECK(m_CaptureClient->ReleaseBuffer(_inputFramesAvailable), "Unable to release capture buffer", goto Cleanup);
@@ -484,13 +469,13 @@ namespace Audijo
 						_outputFramesAvailable -= _framePadding;
 
 						// If we have enough data to write to the device from the output ring buffer
-						if (_outputFramesAvailable != 0 && _outRingBuffer.Size() >= _outputFramesAvailable * _nOutChannels * FormatBytes(_outFormat))
+						if (_outputFramesAvailable != 0 && _outRingBuffer.Size() >= _outputFramesAvailable * _nOutChannels * FormatBytes(_deviceOutFormat))
 						{
 							// Get the buffer
 							CHECK(m_RenderClient->GetBuffer(_outputFramesAvailable, &_streamBuffer), "Failed to retrieve output buffer.", goto Cleanup);
 
 							// Put data in the output device buffer
-							for (int i = 0; i < _outputFramesAvailable * _nOutChannels * FormatBytes(_outFormat); i++)
+							for (int i = 0; i < _outputFramesAvailable * _nOutChannels * FormatBytes(_deviceOutFormat); i++)
 								_streamBuffer[i] = _outRingBuffer.Dequeue();
 							
 							CHECK(m_RenderClient->ReleaseBuffer(_outputFramesAvailable, 0), "Unable to release capture buffer", goto Cleanup);

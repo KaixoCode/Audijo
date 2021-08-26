@@ -37,14 +37,81 @@ extern IASIO* theAsioDriver;
 
 namespace Audijo
 {
+#define CHECK(x, msg, type) if (auto _error = x) { LOGL(msg << " (" << getAsioErrorString(_error) << ")"); type; }
+	/*
+	 * API Specific DeviceInfo object
+	 */
+	DeviceInfo<Asio>::DeviceInfo(DeviceInfo<>&& d)
+		: DeviceInfo<>{ std::forward<DeviceInfo<>>(d) }
+	{
+		Channels();
+	}
+
+	ChannelInfo& DeviceInfo<Asio>::Channel(int index, bool input) const
+	{
+		return input ? Channels()[index] : Channels()[inputChannels + index];
+	};
+
+	std::vector<ChannelInfo>& DeviceInfo<Asio>::Channels() const
+	{
+		// Only probe information if it's the same id, or when there's not an opened asio driver
+		if (m_Channels.empty() && ((AsioApi::m_AsioApi && AsioApi::m_AsioApi->m_Parameters.input == id) || AsioApi::m_State == AsioApi::Loaded))
+		{
+			// Only open driver if not currently opened
+			if (!AsioApi::m_AsioApi || AsioApi::m_AsioApi->m_Parameters.input != id)
+			{
+				char _name[32];
+				drivers.asioGetDriverName(id, _name, 32);
+				drivers.loadDriver(_name);
+				ASIOInit(&driverInfo);
+			}
+
+			// Load inputs
+			for (int i = 0; i < inputChannels; i++)
+			{
+				ASIOChannelInfo info;
+				info.channel = i;
+				info.isInput = true;
+				ASIOGetChannelInfo(&info);
+				m_Channels.emplace_back(info.name, info.channelGroup, (bool)info.isActive, true);
+			}
+
+			// Load outputs
+			for (int i = 0; i < outputChannels; i++)
+			{
+				ASIOChannelInfo info;
+				info.channel = i;
+				info.isInput = false;
+				ASIOGetChannelInfo(&info);
+				m_Channels.emplace_back(info.name, info.channelGroup, (bool)info.isActive, false);
+			}
+
+			// Remove current driver if it's not the opened one
+			if (!AsioApi::m_AsioApi || AsioApi::m_AsioApi->m_Parameters.input != id)
+				drivers.removeCurrentDriver();
+
+			return m_Channels;
+		}
+		else
+			return m_Channels;
+	}
+
+	/*
+	 * API
+	 */
+
 	AsioApi::AsioApi()
 		: ApiBase()
 	{   // Load devices
 		Devices();
 	}
 
-	const std::vector<DeviceInfo>& AsioApi::Devices()
+	const std::vector<DeviceInfo<Asio>>& AsioApi::Devices()
 	{
+		// Can't probe new info when a stream has been opened
+		if (m_State != Loaded)
+			return m_Devices;
+
 		// Make a list of all numbers from 0 to amount of current devices
 		// this is used to determine if we need to delete devices from the list after querying.
 		std::vector<int> _toDelete;
@@ -56,12 +123,7 @@ namespace Audijo
 		{
 			// Get device name
 			char _name[32];
-			auto _error = drivers.asioGetDriverName(i, _name, 32);
-			if (_error != ASE_OK)
-			{
-				LOGL("Failed to load device " << _name << " (" << getAsioErrorString(_error) << ")");
-				continue;
-			}
+			CHECK(drivers.asioGetDriverName(i, _name, 32), "Failed to load device " << _name, continue);
 
 			// Load the driver to collect further information
 			if (!drivers.loadDriver(_name))
@@ -71,22 +133,11 @@ namespace Audijo
 			}
 
 			// Init the asio
-			_error = ASIOInit(&driverInfo);
-			if (_error != ASE_OK)
-			{
-				LOGL("Failed to load device " << _name << " (" << getAsioErrorString(_error) << ")");
-				continue;
-			}
+			CHECK(ASIOInit(&driverInfo), "Failed to load device " << _name, continue);
 
 			// Get channel counts
 			long _in, _out;
-			_error = ASIOGetChannels(&_in, &_out);
-			if (_error != ASE_OK)
-			{
-				drivers.removeCurrentDriver();
-				LOGL("Failed to load device " << _name << " (" << getAsioErrorString(_error) << ")");
-				continue;
-			}
+			CHECK(ASIOGetChannels(&_in, &_out), "Failed to load device " << _name, drivers.removeCurrentDriver(); continue);
 
 			// Determine samplerates
 			std::vector<double> _srates;
@@ -118,7 +169,7 @@ namespace Audijo
 			}
 
 			if (!_found) // No default in ASIO, so just id == 0
-				m_Devices.push_back(DeviceInfo{ i, _name, _in, _out, _srates, i == 0 });
+				m_Devices.push_back(DeviceInfo<Asio>{{ i, _name, _in, _out, _srates, i == 0, Asio }});
 		}
 
 		// Delete all devices we couldn't find again.
@@ -128,7 +179,7 @@ namespace Audijo
 		return m_Devices;
 	}
 
-	Error AsioApi::OpenStream(const StreamSettings& settings)
+	Error AsioApi::OpenStream(const StreamParameters& settings)
 	{
 		// The ASIO state is global, since ASIO only allows a single driver to be opened per program,
 		// so if the state is not 'Loaded' we can't open another stream.
@@ -139,46 +190,43 @@ namespace Audijo
 		FreeBuffers();
 
 		// Store stream settings
-		m_Settings = settings;
+		m_Parameters = settings;
 
 		// Check device ids
 		{
 			// If only one of the device ids has been set, set other one to the same one.
-			if (m_Settings.input.deviceId == NoDevice && m_Settings.output.deviceId != NoDevice)
-				m_Settings.input.deviceId = m_Settings.output.deviceId;
+			if (m_Parameters.input == NoDevice && m_Parameters.output != NoDevice)
+				m_Parameters.input = m_Parameters.output;
 
-			if (m_Settings.input.deviceId != NoDevice && m_Settings.output.deviceId == NoDevice)
-				m_Settings.output.deviceId = m_Settings.input.deviceId;
+			if (m_Parameters.input != NoDevice && m_Parameters.output == NoDevice)
+				m_Parameters.output = m_Parameters.input;
 
 			// For an ASIO the input and output device need to be the same.
-			if (m_Settings.input.deviceId != m_Settings.output.deviceId)
+			if (m_Parameters.input != m_Parameters.output)
 			{
 				LOGL("The input and output device should be the same when creating a duplex ASIO stream.");
 				return InvalidDuplex;
 			}
 
 			// Since ASIO doesn't have a 'default' device, just set it to 0 if none is selected
-			if (m_Settings.input.deviceId == DefaultDevice)
-				m_Settings.input.deviceId = m_Settings.output.deviceId = 0;
+			if (m_Parameters.input == Default)
+				m_Parameters.input = m_Parameters.output = 0;
 		}
 
 		// Set default channel count
 		{
 			// If nmr of channels is not set, set it to max
-			if (m_Settings.input.channels <= -1)
-				m_Settings.input.channels = m_Devices[m_Settings.input.deviceId].inputChannels;
-
-			if (m_Settings.output.channels <= -1)
-				m_Settings.output.channels = m_Devices[m_Settings.output.deviceId].outputChannels;
+			m_Information.inputChannels = m_Devices[m_Parameters.input].inputChannels;
+			m_Information.outputChannels = m_Devices[m_Parameters.output].outputChannels;
 		}
 
 		// Retrieve necessary settings;
-		int _deviceId = m_Settings.input.deviceId;
-		int _nInChannels = m_Settings.input.channels;
-		int _nOutChannels = m_Settings.output.channels;
+		int _deviceId = m_Parameters.input;
+		int _nInChannels = m_Information.inputChannels;
+		int _nOutChannels = m_Information.outputChannels;
 		int _nChannels = _nInChannels + _nOutChannels;
-		int _bufferSize = m_Settings.bufferSize;
-		int _sampleRate = m_Settings.sampleRate;
+		int _bufferSize = m_Parameters.bufferSize;
+		int _sampleRate = m_Parameters.sampleRate;
 
 		// Open the driver
 		{
@@ -187,39 +235,25 @@ namespace Audijo
 			// Init the ASIO
 			driverInfo.asioVersion = 2;
 			driverInfo.sysRef = GetForegroundWindow();
-			auto _error = ASIOInit(&driverInfo);
-			if (_error != ASE_OK)
-			{
-				LOGL("Failed to initialize ASIO: " << getAsioErrorString(_error));
-
-				// Either the hardware failed or there is no input/output present
-				return _error == ASE_HWMalfunction ? Fail : NotPresent;
-			}
+			CHECK(ASIOInit(&driverInfo), "Failed to initialize ASIO: ", return _error == ASE_HWMalfunction ? Fail : NotPresent);
 			m_State = Initialized;
 		}
 
 		// SampleRate
 		{
 			// If no samplerate has been selected, pick one.
-			if (_sampleRate == -1)
+			if (_sampleRate == Default)
 			{
 				int _index = 0;
 				while (_index < sizeof(m_SampleRates) / sizeof(double) && ASIOCanSampleRate(m_SampleRates[_index]) != ASE_OK)
 					_index++;
 				_sampleRate = m_SampleRates[_index];
-				m_Settings.sampleRate = _sampleRate; // Also update in settings
+				m_Parameters.sampleRate = _sampleRate; // Also update in settings
 			}
 
 			// Set samplerate
-			auto _error = ASIOSetSampleRate(_sampleRate);
-			if (_error != ASE_OK)
-			{
-				LOGL("Failed to set sample rate to " << _sampleRate << ": " << getAsioErrorString(_error));
-				m_State = Loaded; // Reset the state to loaded
-
-				// Either it's an invalid sample rate or there is no input/output present
-				return _error == ASE_InvalidMode ? InvalidSampleRate : NotPresent;
-			}
+			CHECK(ASIOSetSampleRate(_sampleRate), "Failed to set sample rate to " << _sampleRate << ": ",
+				m_State = Loaded; return _error == ASE_InvalidMode ? InvalidSampleRate : NotPresent);
 		}
 
 		// Get channel formats
@@ -228,32 +262,27 @@ namespace Audijo
 			ASIOChannelInfo _inChannelInfo;
 			_inChannelInfo.channel = 0;
 			_inChannelInfo.isInput = true;
-			auto _error = ASIOGetChannelInfo(&_inChannelInfo);
-			if (_error != ASE_OK) 
-			{
-				LOGL("Failed to collect channel info: " << getAsioErrorString(_error));
-				m_State = Loaded;  // Reset the state to loaded
-				return NotPresent;
-			}
+			CHECK(ASIOGetChannelInfo(&_inChannelInfo), "Failed to collect channel info: ",
+				m_State = Loaded; return NotPresent);
 
-			m_Settings.m_InByteSwap = false;
-			m_Settings.m_DeviceInFormat = Float32;
+			m_Information.inByteSwap = false;
+			m_Information.deviceInFormat = Float32;
 			switch (_inChannelInfo.type)
 			{
-			case ASIOSTInt16MSB: m_Settings.m_InByteSwap = true;
-			case ASIOSTInt16LSB: m_Settings.m_DeviceInFormat = Int16;
+			case ASIOSTInt16MSB: m_Information.inByteSwap = true;
+			case ASIOSTInt16LSB: m_Information.deviceInFormat = Int16;
 				break;		
 			case ASIOSTInt24MSB:
 			case ASIOSTInt24LSB:
 				return UnsupportedSampleFormat;
-			case ASIOSTInt32MSB: m_Settings.m_InByteSwap = true;
-			case ASIOSTInt32LSB: m_Settings.m_DeviceInFormat = Int32;
+			case ASIOSTInt32MSB: m_Information.inByteSwap = true;
+			case ASIOSTInt32LSB: m_Information.deviceInFormat = Int32;
 				break;			
-			case ASIOSTFloat32MSB: m_Settings.m_InByteSwap = true;
-			case ASIOSTFloat32LSB: m_Settings.m_DeviceInFormat = Float32;
+			case ASIOSTFloat32MSB: m_Information.inByteSwap = true;
+			case ASIOSTFloat32LSB: m_Information.deviceInFormat = Float32;
 				break;			
-			case ASIOSTFloat64MSB: m_Settings.m_InByteSwap = true;
-			case ASIOSTFloat64LSB: m_Settings.m_DeviceInFormat = Float64;
+			case ASIOSTFloat64MSB: m_Information.inByteSwap = true;
+			case ASIOSTFloat64LSB: m_Information.deviceInFormat = Float64;
 				break;
 			}
 
@@ -261,45 +290,35 @@ namespace Audijo
 			ASIOChannelInfo _outChannelInfo;
 			_outChannelInfo.channel = 0;
 			_outChannelInfo.isInput = true;
-			_error = ASIOGetChannelInfo(&_outChannelInfo);
-			if (_error != ASE_OK)
-			{
-				LOGL("Failed to collect channel info: " << getAsioErrorString(_error));
-				m_State = Loaded;  // Reset the state to loaded
-				return NotPresent;
-			}
+			CHECK(ASIOGetChannelInfo(&_outChannelInfo), "Failed to collect channel info: ",
+				m_State = Loaded; return NotPresent);
 
-			m_Settings.m_OutByteSwap = false;
-			m_Settings.m_DeviceOutFormat = Float32;
+			m_Information.outByteSwap = false;
+			m_Information.deviceOutFormat = Float32;
 			switch (_outChannelInfo.type)
 			{
-			case ASIOSTInt16MSB: m_Settings.m_OutByteSwap = true;
-			case ASIOSTInt16LSB: m_Settings.m_DeviceOutFormat = Int16;
+			case ASIOSTInt16MSB: m_Information.outByteSwap = true;
+			case ASIOSTInt16LSB: m_Information.deviceOutFormat = Int16;
 				break;			
 			case ASIOSTInt24MSB: 
 			case ASIOSTInt24LSB: 
 				return UnsupportedSampleFormat;
-			case ASIOSTInt32MSB: m_Settings.m_OutByteSwap = true;
-			case ASIOSTInt32LSB: m_Settings.m_DeviceOutFormat = Int32;
+			case ASIOSTInt32MSB: m_Information.outByteSwap = true;
+			case ASIOSTInt32LSB: m_Information.deviceOutFormat = Int32;
 				break;
-			case ASIOSTFloat32MSB: m_Settings.m_OutByteSwap = true;
-			case ASIOSTFloat32LSB: m_Settings.m_DeviceOutFormat = Float32;
+			case ASIOSTFloat32MSB: m_Information.outByteSwap = true;
+			case ASIOSTFloat32LSB: m_Information.deviceOutFormat = Float32;
 				break;
-			case ASIOSTFloat64MSB: m_Settings.m_OutByteSwap = true;
-			case ASIOSTFloat64LSB: m_Settings.m_DeviceOutFormat = Float64;
+			case ASIOSTFloat64MSB: m_Information.outByteSwap = true;
+			case ASIOSTFloat64LSB: m_Information.deviceOutFormat = Float64;
 				break;
 			}
 
 			// If callback has been set, deduce format type
 			if (m_Callback)
 			{
-				int bytes = m_Callback->Bytes();
-				bool floating = m_Callback->Floating();
-
-				if (floating)
-					m_Settings.m_Format = bytes == 4 ? Float32 : Float64;
-				else
-					m_Settings.m_Format = bytes == 1 ? Int8 : bytes == 2 ? Int16 : Int32;
+				m_Information.inFormat = (SampleFormat)m_Callback->InFormat();
+				m_Information.outFormat = (SampleFormat)m_Callback->OutFormat();
 			}
 			else
 			{
@@ -324,14 +343,9 @@ namespace Audijo
 				m_BufferInfos[i].channelNum = i - _nInChannels;
 
 			// Create the buffers
-			auto _error = ASIOCreateBuffers(m_BufferInfos, _nChannels, _bufferSize, &m_Callbacks);
-			if (_error != ASE_OK)
-			{
-				LOGL("Failed to create ASIO buffers: " << getAsioErrorString(_error));
-
-				// Either it failed to allocate memory, the buffersize is invalid or the input/output aren't present
-				return _error == ASE_NoMemory ? NoMemory : _error == ASE_InvalidMode ? InvalidBufferSize : NotPresent;
-			}
+			CHECK(ASIOCreateBuffers(m_BufferInfos, _nChannels, _bufferSize, &m_Callbacks), "Failed to create ASIO buffers: ",
+				return _error == ASE_NoMemory ? NoMemory : _error == ASE_InvalidMode ? InvalidBufferSize : NotPresent);
+			
 			m_State = Prepared;
 
 			// Allocate the user callback buffers
@@ -368,9 +382,7 @@ namespace Audijo
 		if (m_State == Prepared)
 			return NotRunning;
 
-		auto error = ASIOStop();
-		if (error != ASE_OK)
-			return Fail;
+		CHECK(ASIOStop(), "Failed to stop the stream.", return Fail);
 
 		m_State = Prepared;
 		return NoError;
@@ -382,15 +394,9 @@ namespace Audijo
 			return NotOpen;
 
 		if (m_State == Running)
-		{
-			auto error = ASIOStop();
-			if (error != ASE_OK)
-				return Fail;
-		}
+			CHECK(ASIOStop(), "Failed to stop the stream.", return Fail);
 
-		auto error = ASIODisposeBuffers();
-		if (error != ASE_OK)
-			return Fail;
+		CHECK(ASIODisposeBuffers(), "Failed to dispose buffers", return Fail);
 
 		m_State = Loaded;
 	};
@@ -400,13 +406,13 @@ namespace Audijo
 		if (m_State == Loaded)
 			return NotOpen;
 
-		ASIOControlPanel(); 
+		CHECK(ASIOControlPanel(), "Failed to open control panel", return Fail);
 		return NoError;
 	}
 
 	void AsioApi::SampleRateDidChange(ASIOSampleRate sRate)
 	{
-		m_AsioApi->m_Settings.sampleRate = sRate;
+		m_AsioApi->m_Parameters.sampleRate = sRate;
 	};
 
 	long AsioApi::AsioMessage(long selector, long value, void* message, double* opt)
@@ -420,7 +426,7 @@ namespace Audijo
 			// When the buffer size changes, free the current buffers
 			// and then allocate new buffers for the user callback
 			m_AsioApi->FreeBuffers();
-			m_AsioApi->m_Settings.bufferSize = value;
+			m_AsioApi->m_Parameters.bufferSize = value;
 			m_AsioApi->AllocateBuffers();
 			return true;
 		}
@@ -436,25 +442,26 @@ namespace Audijo
 	ASIOTime* AsioApi::BufferSwitchTimeInfo(ASIOTime* params, long doubleBufferIndex, ASIOBool directProcess)
 	{
 		// Retrieve information from object
-		int _nInChannels  = m_AsioApi->m_Settings.input.channels;
-		int _nOutChannels = m_AsioApi->m_Settings.output.channels;
-		int _bufferSize   = m_AsioApi->m_Settings.bufferSize;
-		auto _sampleRate  = m_AsioApi->m_Settings.sampleRate;
-		auto _inFormat    = m_AsioApi->m_Settings.m_DeviceInFormat;
-		bool _inSwap      = m_AsioApi->m_Settings.m_InByteSwap;
-		auto _outFormat   = m_AsioApi->m_Settings.m_DeviceOutFormat;
-		bool _outSwap     = m_AsioApi->m_Settings.m_OutByteSwap;
-		auto _format      = m_AsioApi->m_Settings.m_Format;
-		char** _inputs    = m_AsioApi->m_InputBuffers;
-		char** _outputs   = m_AsioApi->m_OutputBuffers;
+		int _nInChannels      = m_AsioApi->m_Information.inputChannels;
+		int _nOutChannels     = m_AsioApi->m_Information.outputChannels;
+		int _bufferSize       = m_AsioApi->m_Parameters.bufferSize;
+		auto _sampleRate      = m_AsioApi->m_Parameters.sampleRate;
+		auto _deviceInFormat  = m_AsioApi->m_Information.deviceInFormat;
+		bool _inSwap          = m_AsioApi->m_Information.inByteSwap;
+		auto _deviceOutFormat = m_AsioApi->m_Information.deviceOutFormat;
+		bool _outSwap         = m_AsioApi->m_Information.outByteSwap;
+		auto _inFormat        = m_AsioApi->m_Information.inFormat;
+		auto _outFormat       = m_AsioApi->m_Information.outFormat;
+		char** _inputs        = m_AsioApi->m_InputBuffers;
+		char** _outputs       = m_AsioApi->m_OutputBuffers;
 
 		// Prepare the input buffer
 		for (int i = 0; i < _nInChannels; i++)
 		{
 			char* _temp = (char*)m_BufferInfos[i].buffers[doubleBufferIndex];
 			if (_inSwap)
-				m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _inFormat);
-			m_AsioApi->ConvertBuffer(_inputs[i], _temp, _bufferSize, _inFormat, _format);
+				m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _deviceInFormat);
+			m_AsioApi->ConvertBuffer(_inputs[i], _temp, _bufferSize, _deviceInFormat, _inFormat);
 		}
 
 		// usercallback
@@ -466,9 +473,9 @@ namespace Audijo
 		for (int i = 0; i < _nOutChannels; i++)
 		{
 			char* _temp = (char*)m_BufferInfos[i + _nOutChannels].buffers[doubleBufferIndex];
-			m_AsioApi->ConvertBuffer(_temp, _outputs[i], _bufferSize, _outFormat, _format);
+			m_AsioApi->ConvertBuffer(_temp, _outputs[i], _bufferSize, _deviceOutFormat, _outFormat);
 			if (_outSwap)
-				m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _outFormat);
+				m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _deviceOutFormat);
 		}
 
 		return params;

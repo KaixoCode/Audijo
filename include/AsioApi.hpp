@@ -8,15 +8,29 @@
 
 namespace Audijo
 {
+	template<>
+	struct DeviceInfo<Asio> : public DeviceInfo<>
+	{
+		DeviceInfo(DeviceInfo<>&& d);
+
+		ChannelInfo& Channel(int index, bool input) const;
+		std::vector<ChannelInfo>& Channels() const;
+
+	private:
+		mutable std::vector<ChannelInfo> m_Channels;
+	};
+
 	class AsioApi : public ApiBase
 	{
 		enum State { Loaded, Initialized, Prepared, Running };
 	public:
 		AsioApi();
 		
-		const std::vector<DeviceInfo>& Devices() override;
+		const std::vector<DeviceInfo<Asio>>& Devices();
+		const DeviceInfo<>& Device(int id) override { for (auto& i : m_Devices) if (i.id == id) return i; };
+		const DeviceInfo<Asio>& ApiDevice(int id) { for (auto& i : m_Devices) if (i.id == id) return i; };
 
-		Error OpenStream(const StreamSettings& settings = StreamSettings{}) override;
+		Error OpenStream(const StreamParameters& settings = StreamParameters{}) override;
 		Error StartStream() override;
 		Error StopStream() override;
 		Error CloseStream() override;
@@ -24,6 +38,8 @@ namespace Audijo
 		Error OpenControlPanel();
 
 	protected:
+		std::vector<DeviceInfo<Asio>> m_Devices;
+
 		static void SampleRateDidChange(ASIOSampleRate sRate);
 		static long AsioMessage(long selector, long value, void* message, double* opt);
 		static ASIOTime* BufferSwitchTimeInfo(ASIOTime* params, long doubleBufferIndex, ASIOBool directProcess);
@@ -32,5 +48,7 @@ namespace Audijo
 		static ASIOBufferInfo* m_BufferInfos;
 		static AsioApi* m_AsioApi;
 		static State m_State;
+
+		friend class DeviceInfo<Asio>;
 	};
 }

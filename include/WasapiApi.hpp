@@ -4,6 +4,14 @@
 
 namespace Audijo
 {
+	template<>
+	struct DeviceInfo<Wasapi> : public DeviceInfo<>
+	{
+		DeviceInfo(DeviceInfo<>&& d)
+			: DeviceInfo<>{ std::forward<DeviceInfo<>>(d) }
+		{}
+	};
+
 	class WasapiApi : public ApiBase
 	{
 		template<typename T>
@@ -49,14 +57,18 @@ namespace Audijo
 	public:
 		WasapiApi();
 
-		const std::vector<DeviceInfo>& Devices() override;
+		const std::vector<DeviceInfo<Wasapi>>& Devices();
+		const DeviceInfo<>& Device(int id) override { for (auto& i : m_Devices) if (i.id == id) return (DeviceInfo<>&)i; };
+		const DeviceInfo<Wasapi>& ApiDevice(int id) { for (auto& i : m_Devices) if (i.id == id) return i; };
 
-		Error OpenStream(const StreamSettings& settings = StreamSettings{}) override;
+		Error OpenStream(const StreamParameters& settings = StreamParameters{}) override;
 		Error StartStream() override;
 		Error StopStream() override;
 		Error CloseStream() override;
 
 	protected:
+		std::vector<DeviceInfo<Wasapi>> m_Devices;
+
 		bool m_CoInitialized = false;
 		Pointer<IMMDeviceEnumerator> m_DeviceEnumerator; // The wasapi device enumerator
 		Pointer<IMMDeviceCollection> m_WasapiDevices; // Device collection

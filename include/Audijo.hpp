@@ -6,11 +6,6 @@
 
 namespace Audijo
 {
-	enum Api 
-	{
-		Unspecified, Asio, Wasapi
-	};
-
 	/**
 	 * Main stream object, with unspecified Api, so it can be dynamically set. To access api specific functions
 	 * you need to cast to an api specific Stream object.
@@ -34,10 +29,11 @@ namespace Audijo
 		}
 
 		/**
-		 * Search for all available devices. When called more than once, the list will be updated.
-		 * @return all available devices given the chosen api.
+		 * Returns device with the given id.
+		 * @param id device id
+		 * @return device with id
 		 */
-		const std::vector<DeviceInfo>& Devices() { return m_Api->Devices(); }
+		const DeviceInfo<>& Device(int id) { return m_Api->Device(id); }
 
 		/**
 		 * Set the callback. A valid callback signare is:
@@ -82,7 +78,7 @@ namespace Audijo
 		 * InvalidBufferSize - If the buffer size is not supported<br>
 		 * NoError - If stream started successfully
 		 */
-		Error OpenStream(const StreamSettings& settings = StreamSettings{}) { return m_Api->OpenStream(settings); };
+		Error OpenStream(const StreamParameters& settings = StreamParameters{}) { return m_Api->OpenStream(settings); };
 
 		/**
 		 * Starts the flow of audio through the opened stream. Does nothing
@@ -114,7 +110,6 @@ namespace Audijo
 		 * Fail - If device failed to close<br>
 		 * NoError - If stream stopped successfully
 		 */
-
 		Error CloseStream() { return m_Api->CloseStream(); };
 
 		/**
@@ -145,6 +140,19 @@ namespace Audijo
 		Stream()
 			: Stream<>(Wasapi)
 		{}
+
+		/**
+		 * Search for all available devices. When called more than once, the list will be updated.
+		 * @return all available devices given the chosen api.
+		 */
+		const std::vector<DeviceInfo<Wasapi>>& Devices() { return ((WasapiApi*)m_Api.get())->Devices(); }
+
+		/**
+		 * Returns device with the given id.
+		 * @param id device id
+		 * @return device with id
+		 */
+		const DeviceInfo<Wasapi>& Device(int id) { return ((WasapiApi*)m_Api.get())->ApiDevice(id); }
 	};
 
 	/**
@@ -161,8 +169,24 @@ namespace Audijo
 
 		/**
 		 * Opens the ASIO control panel.
+		 * @return
+		 * NotOpen - if no device has been opened yet<br>
+		 * NoError - On success
 		 */
 		Error OpenControlPanel() { return ((AsioApi*)m_Api.get())->OpenControlPanel(); }
+
+		/**
+		 * Search for all available devices. When called more than once, the list will be updated.
+		 * @return all available devices given the chosen api.
+		 */
+		const std::vector<DeviceInfo<Asio>>& Devices() { return ((AsioApi*)m_Api.get())->Devices(); }
+
+		/**
+		 * Returns device with the given id.
+		 * @param id device id
+		 * @return device with id
+		 */
+		const DeviceInfo<Asio>& Device(int id) { return ((AsioApi*)m_Api.get())->ApiDevice(id); }
 	};
 
 	Stream(Api)->Stream<Unspecified>;

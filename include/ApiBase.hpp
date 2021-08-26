@@ -4,6 +4,11 @@
 
 namespace Audijo 
 {
+	enum Api
+	{
+		Unspecified, Asio, Wasapi
+	};
+
 	enum SampleFormat 
 	{
 		None,  // Float  Bytes
@@ -14,6 +19,15 @@ namespace Audijo
 		Float64 = 0x10 | 0x08
 	};
 
+	struct ChannelInfo
+	{
+		std::string name;
+		long group;
+		bool active;
+		bool input;
+	};
+
+	template<Api api = Unspecified>
 	struct DeviceInfo 
 	{
 		/**
@@ -47,37 +61,27 @@ namespace Audijo
 		bool defaultDevice;
 
 		/**
-		 * Sample format
+		 * From which api is this device
 		 */
-		int sampleFormat;
+		Api api = Unspecified;
 	};
 
-	enum Device { DefaultDevice = -2, NoDevice = -1 };
+	template<typename ...Args>
+	DeviceInfo(Args...)->DeviceInfo<Unspecified>;
 
-	struct Parameters 
-	{
-		/**
-		 * Device id
-		 */
-		int deviceId = DefaultDevice;
+	enum SettingValues { Default = -2, NoDevice = -1 };
 
-	    /**
-		 * Amount of channels
-		 */
-		int channels = -1;
-	};
-
-	struct StreamSettings
+	struct StreamParameters
 	{
 		/** 
 		 * Parameters for the input device 
 		 */
-		Parameters input{};
+		int input = Default;
 
 		/** 
 		 * Parameters for the output device 
 		 */
-		Parameters output{};
+		int output = Default;
 
 		/** 
 		 * Buffer size 
@@ -87,18 +91,24 @@ namespace Audijo
 		/** 
 		 * Sample rate 
 		 */
-		double sampleRate = -1;
+		double sampleRate = Default;
 
-	private:
-		SampleFormat m_Format = None;
-		SampleFormat m_DeviceInFormat = None;
-		SampleFormat m_DeviceOutFormat = None;
-		bool m_InByteSwap = false;
-		bool m_OutByteSwap = false;
+		/**
+		 * Allow resampling when chosen samplerate is not available.
+		 */
+		bool resampling = true;
+	};
 
-		friend class AsioApi;
-		friend class WasapiApi;
-		friend class ApiBase;
+	struct StreamInformation
+	{
+		int inputChannels = 0;
+		int outputChannels = 0;
+		SampleFormat inFormat = None;
+		SampleFormat outFormat = None;
+		SampleFormat deviceInFormat = None;
+		SampleFormat deviceOutFormat = None;
+		bool inByteSwap = false;
+		bool outByteSwap = false;
 	};
 
 	enum Error
@@ -128,9 +138,9 @@ namespace Audijo
 	{
 	public:
 		virtual ~ApiBase() { FreeBuffers(); }
-		virtual const std::vector<DeviceInfo>& Devices() = 0;
+		virtual const DeviceInfo<>& Device(int id) = 0;
 
-		virtual Error OpenStream(const StreamSettings& settings = StreamSettings{}) = 0;
+		virtual Error OpenStream(const StreamParameters& settings = StreamParameters{}) = 0;
 		virtual Error StartStream() = 0;
 		virtual Error StopStream() = 0;
 		virtual Error CloseStream() = 0;
@@ -143,10 +153,10 @@ namespace Audijo
 	protected:
 		static inline double m_SampleRates[]{ 48000, 44100, 88200, 96000, 176400, 192000, 352800, 384000, 8000, 11025, 16000, 22050 };
 		
-		std::vector<DeviceInfo> m_Devices;
 		std::unique_ptr<CallbackWrapperBase> m_Callback;
 		void* m_UserData = nullptr;
-		StreamSettings m_Settings{};
+		StreamParameters m_Parameters;
+		StreamInformation m_Information;
 
 		void AllocateBuffers();
 		void FreeBuffers();

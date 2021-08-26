@@ -62,7 +62,6 @@ namespace Audijo
 	template<typename Ret, typename InFormat, typename OutFormat, typename CI,  typename ...UserData>
 	concept ValidCallback = std::is_same_v<Ret, void>      // Return must be void
 		&& ValidFormat<InFormat> && ValidFormat<OutFormat> // First 2 must be valid formats
-		&& std::is_same_v<InFormat, OutFormat>
 		&& std::is_same_v<CI, CallbackInfo>
 		&& sizeof...(UserData) <= 1 && ((std::is_reference_v<UserData> && ...) 
 			|| (std::is_pointer_v<UserData> && ...));      // userdata is optional, must be reference or pointer
@@ -85,8 +84,8 @@ namespace Audijo
 	struct CallbackWrapperBase
 	{
 		virtual void Call(void** in, void** out, CallbackInfo&& info, void* userdata) = 0;
-		virtual int Bytes() = 0;
-		virtual bool Floating() = 0;
+		virtual int InFormat() = 0;
+		virtual int OutFormat() = 0;
 	};
 
 	template<typename, typename>
@@ -104,8 +103,8 @@ namespace Audijo
 			: m_Callback(callback)
 		{}
 
-		int Bytes() override { return sizeof(std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>); }
-		bool Floating() override { return std::is_floating_point_v<std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>>; }
+		int InFormat() override { return (std::is_floating_point_v<std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>> ? 0x10 : 0x00) | sizeof(std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>); }
+		int OutFormat() override { return (std::is_floating_point_v<std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<1, Args...>>>> ? 0x10 : 0x00) | sizeof(std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<1, Args...>>>); }
 
 		void Call(void** in, void** out, CallbackInfo&& info, void* userdata) override
 		{

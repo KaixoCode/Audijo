@@ -28,32 +28,27 @@ namespace Audijo
 
 	void ApiBase::AllocateBuffers()
 	{
-		int _nInChannels = m_Settings.input.channels;
-		int _nOutChannels = m_Settings.output.channels;
-		int _nChannels = _nInChannels + _nOutChannels;
-		int _bufferSize = m_Settings.bufferSize;
-		double _sampleRate = m_Settings.sampleRate;
-		auto _inFormat = m_Settings.m_DeviceInFormat;
-		auto _inSwap = m_Settings.m_InByteSwap;
-		auto _outFormat = m_Settings.m_DeviceOutFormat;
-		auto _outSwap = m_Settings.m_OutByteSwap;
-		auto _format = m_Settings.m_Format;
+		int _nInChannels = m_Information.inputChannels;
+		int _nOutChannels = m_Information.outputChannels;
+		int _bufferSize = m_Parameters.bufferSize;
+		auto _inFormat = m_Information.inFormat;
+		auto _outFormat = m_Information.outFormat;
 
 		m_InputBuffers = new char* [_nInChannels];
 		m_OutputBuffers = new char* [_nOutChannels];
 
 		for (int i = 0; i < _nInChannels; i++)
-			m_InputBuffers[i] = new char[_bufferSize * FormatBytes(_format)];
+			m_InputBuffers[i] = new char[_bufferSize * FormatBytes(_inFormat)];
 
 		for (int i = 0; i < _nOutChannels; i++)
-			m_OutputBuffers[i] = new char[_bufferSize * FormatBytes(_format)];
+			m_OutputBuffers[i] = new char[_bufferSize * FormatBytes(_outFormat)];
 	}
 
 	void ApiBase::FreeBuffers()
 	{
 		if (m_InputBuffers != nullptr)
 		{
-			int _nInChannels = m_Settings.input.channels;
+			int _nInChannels = m_Information.inputChannels;
 			for (int i = 0; i < _nInChannels; i++)
 				delete[] m_InputBuffers[i];
 			delete[] m_InputBuffers;
@@ -61,7 +56,7 @@ namespace Audijo
 
 		if (m_OutputBuffers != nullptr)
 		{
-			int _nOutChannels = m_Settings.output.channels;
+			int _nOutChannels = m_Information.outputChannels;
 			for (int i = 0; i < _nOutChannels; i++)
 				delete[] m_OutputBuffers[i];
 			delete[] m_OutputBuffers;
