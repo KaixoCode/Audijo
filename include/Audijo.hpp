@@ -20,20 +20,18 @@ namespace Audijo
 		 */
 		Stream(Api api)
 		{
-			switch (api)
-			{
-			case Asio: m_Api = std::make_unique<AsioApi>(); break;
-			case Wasapi: m_Api = std::make_unique<WasapiApi>(); break;
-			default: throw std::exception("Incompatible api");
-			}
+			Api(api);
 		}
+
+		Stream()
+		{}
 
 		/**
 		 * Returns device with the given id.
 		 * @param id device id
 		 * @return device with id
 		 */
-		const DeviceInfo<>& Device(int id) { return m_Api->Device(id); }
+		const DeviceInfo<>& Device(int id) const { return m_Api->Device(id); }
 
 		/**
 		 * Set the callback. A valid callback signare is:
@@ -125,6 +123,20 @@ namespace Audijo
 		template<Api api>
 		Stream<api>& Get() { return *(Stream<api>*)this; }
 
+		/**
+		 * Set the api.
+		 * @param api api
+		 */
+		void Api(Api api)
+		{
+			switch (api)
+			{
+			case Asio: m_Api = std::make_unique<AsioApi>(); break;
+			case Wasapi: m_Api = std::make_unique<WasapiApi>(); break;
+			default: throw std::exception("Incompatible api");
+			}
+		}
+
 	protected:
 		std::unique_ptr<ApiBase> m_Api;
 	};
@@ -190,5 +202,6 @@ namespace Audijo
 	};
 
 	Stream(Api)->Stream<Unspecified>;
+	Stream()->Stream<Unspecified>;
 }
 

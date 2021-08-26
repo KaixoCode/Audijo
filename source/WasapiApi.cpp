@@ -191,7 +191,7 @@ namespace Audijo
 			CHECK(m_InputClient->GetService(__uuidof(IAudioCaptureClient), (void**)&m_CaptureClient), "Unable to retrieve the capture client.", return Fail);
 			
 			// If no samplerate, set to supported samplerate
-			if (_sampleRate == -1)
+			if (_sampleRate == Default)
 				m_Parameters.sampleRate = _sampleRate = _inFormat->nSamplesPerSec;
 
 			// Otherwise check samplerate
@@ -234,14 +234,14 @@ namespace Audijo
 			CHECK(m_OutputClient->GetMixFormat(&_outFormat), "Unable to retrieve device mix format.", return Fail);
 	
 			// If no samplerate, set to supported samplerate
-			if (_sampleRate == -1)
+			if (_sampleRate == Default)
 				m_Parameters.sampleRate = _sampleRate = _outFormat->nSamplesPerSec;
 
 			// If invalid samplerate and was valid for input device, it's invalid duplex because no support for resampling.
 			if (_outFormat->nSamplesPerSec != _sampleRate)
 			{
 				LOGL("Invalid sample rate selected");
-				return _inDeviceId != -1 ? InvalidDuplex : InvalidSampleRate;
+				return _inDeviceId != NoDevice ? InvalidDuplex : InvalidSampleRate;
 			}
 
 			// Set native sample format
@@ -436,11 +436,21 @@ namespace Audijo
 					else
 						_pushed = true;
 
-					// Wait for one of the events
-					auto _handled = WaitForMultipleObjects(2, _events, false, INFINITE);
+					// Wait for one of the events, if duplex.
+					DWORD _handled;
+					if (m_InputClient && m_OutputClient)
+						_handled = WaitForMultipleObjects(2, _events, false, INFINITE);
+
+					// Wait only for input
+					else if (m_InputClient && !_pulled)
+						_handled = WaitForSingleObject(_captureEvent, INFINITE);
+
+					// Or wait only for output
+					else if (m_OutputClient && _pulled && !_pushed)
+						_handled = WaitForSingleObject(_renderEvent, INFINITE);
 
 					// If there is an input device, we'll get data from its buffer into the input ring buffer
-					if (m_InputClient && _handled == WAIT_OBJECT_0)
+					if (m_InputClient && (!m_OutputClient || _handled == WAIT_OBJECT_0))
 					{
 						// Get the buffer from the device
 						CHECK(m_CaptureClient->GetBuffer(&_streamBuffer, &_inputFramesAvailable, &_flags, nullptr, nullptr), "Failed to retrieve input buffer.", goto Cleanup);
@@ -461,7 +471,7 @@ namespace Audijo
 					}
 
 					// If there is an output device, we can push our ringbuffer to the device.
-					if (m_OutputClient && _handled == WAIT_OBJECT_0 + 1)
+					if (m_OutputClient && (!m_InputClient || _handled == WAIT_OBJECT_0 + 1))
 					{
 						// Calculate the amount of frames available to write to.
 						CHECK(m_OutputClient->GetBufferSize(&_outputFramesAvailable), "Unable to retrieve output buffer size", goto Cleanup);
