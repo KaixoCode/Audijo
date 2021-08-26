@@ -48,7 +48,7 @@ int main()
 			static int _counter = 0;
 			for (int i = 0; i < info.bufferSize; i++, _counter++)
 				for (int j = 0; j < info.outputChannels; j++)
-					output[j][i] = std::sin(_counter * 0.01) * 0.5;
+					output[j][i] = 0.5 * ((std::rand() % 10000) / 10000. - 0.5);
 		});
 
 	StreamSettings _settings;

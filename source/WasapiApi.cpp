@@ -347,16 +347,6 @@ namespace Audijo
 				bool _pulled = false;
 				bool _pushed = false;
 
-				unsigned int _tries = 0;
-			Retry:
-				_tries++;
-				if (_tries > 100)
-				{
-					LOGL("Too many retries to prevent underruns");
-					return;
-				}
-				unsigned int _underruns = 0;
-
 				// Initialize input device
 				if (m_InputClient)
 				{
@@ -469,19 +459,6 @@ namespace Audijo
 					{
 						// Get the buffer from the device
 						CHECK(m_CaptureClient->GetBuffer(&_streamBuffer, &_inputFramesAvailable, &_flags, nullptr, nullptr), "Failed to retrieve input buffer.", goto Cleanup);
-
-						if (_flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY)
-						{
-							_underruns++;
-							if (_underruns > 10)
-							{
-								std::cout << "Detected 10 underruns, reconnecting..." << std::endl;
-								if (m_OutputClient) m_OutputClient->Stop();
-								m_InputClient->Stop();
-								std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 50 + 200));
-								goto Retry;
-							}
-						}
 
 						// If there is enough space in the input ring buffer, we'll enqueue it.
 						if (_inRingBuffer.Space() >= _inputFramesAvailable * _nInChannels * FormatBytes(_inFormat))
