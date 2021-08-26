@@ -12,7 +12,7 @@ else(WIN32)
   message(FATAL_ERROR "FindASIOSDK.cmake: Unsupported platform ${CMAKE_SYSTEM_NAME}" )
 endif(WIN32)
 
-file(GLOB results "${CMAKE_CURRENT_SOURCE_DIR}/libs/as*")
+file(GLOB results "${CMAKE_CURRENT_SOURCE_DIR}/sdk/as*")
 foreach(f ${results})
   if(IS_DIRECTORY ${f})
     set(ASIOSDK_PATH_HINT ${ASIOSDK_PATH_HINT} ${f})
