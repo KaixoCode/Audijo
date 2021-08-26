@@ -20,10 +20,14 @@ Content
 		- StreamWasapi_
 	- :ref:`Structs`
 		- CallbackInfo_
-		- DeviceInfo_
-		- Parameters_
-		- StreamSettings_
+		- ChannelInfo_
+		- StreamParameters_
+		- :ref:`Device Information`
+			- DeviceInfo_
+			- DeviceInfoAsio_
+			- DeviceInfoWasapi_
 	- :ref:`Enums`
+		- SettingValues_
 		- SampleFormat_
 		- Api_
 		- Error_
@@ -54,22 +58,37 @@ Structs
 .. _CallbackInfo:
 .. doxygenstruct:: Audijo::CallbackInfo
     :members:
-	
+
+.. _ChannelInfo:
+.. doxygenstruct:: Audijo::ChannelInfo
+    :members:
+
+.. _StreamParameters:
+.. doxygenstruct:: Audijo::StreamParameters
+    :members:
+
+Device Information
+~~~~~~~~~~~~~~~~~~
+
 .. _DeviceInfo:
 .. doxygenstruct:: Audijo::DeviceInfo
     :members:
 
-.. _Parameters:
-.. doxygenstruct:: Audijo::Parameters
+.. _DeviceInfoAsio:
+.. doxygenstruct:: Audijo::DeviceInfo< Asio >
     :members:
 
-.. _StreamSettings:
-.. doxygenstruct:: Audijo::StreamSettings
+.. _DeviceInfoWasapi:
+.. doxygenstruct:: Audijo::DeviceInfo< Wasapi >
     :members:
 
 Enums
 -----
 
+.. _SettingValues:
+.. doxygenenum:: Audijo::SettingValues
+    :outline:
+	
 .. _SampleFormat:
 .. doxygenenum:: Audijo::SampleFormat
     :outline:
@@ -96,8 +115,8 @@ Simple
     
     int main()
     {
-        // Make an Asio Stream object
-        Stream<Asio> _stream;
+        // Make a Wasapi Stream object
+        Stream<Wasapi> _stream;
         
         // Set the callback, this can be a (capturing) lambda, but also a function pointer
         _stream.SetCallback([&](double** input, double** output, CallbackInfo info)
@@ -108,14 +127,12 @@ Simple
                         output[j][i] = std::sin(_counter * 0.01) * 0.5;
             });
         
-        // Stream settings, like sample rate/buffer size/device id
-        StreamSettings _settings;
-        _settings.bufferSize = 256;
-        _settings.sampleRate = 48000;
-        _settings.output.deviceId = 0;
-		
-        // Open the stream with the settings, and then start the stream
-        _stream.OpenStream(_settings);
+        // Open the stream with default settings, and then start the stream
+        _stream.OpenStream({ 
+            .input = NoDevice, 
+            .output = Default, 
+            .bufferSize = Default, 
+            .sampleRate = Default });
         _stream.StartStream();
         
         // Infinite loop to halt the program.

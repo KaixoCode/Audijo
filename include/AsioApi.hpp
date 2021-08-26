@@ -11,13 +11,25 @@ namespace Audijo
 	template<>
 	struct DeviceInfo<Asio> : public DeviceInfo<>
 	{
-		DeviceInfo(DeviceInfo<>&& d);
-
+		/**
+		 * Get channel information
+		 * @param index channel index
+		 * @param input is input
+		 * @return channel info
+		 */
 		ChannelInfo& Channel(int index, bool input) const;
+
+		/**
+		 * Get list of channel information
+		 * @return vector of ChannelInfo
+		 */
 		std::vector<ChannelInfo>& Channels() const;
 
 	private:
+		DeviceInfo(DeviceInfo<>&& d);
 		mutable std::vector<ChannelInfo> m_Channels;
+
+		friend class AsioApi;
 	};
 
 	class AsioApi : public ApiBase

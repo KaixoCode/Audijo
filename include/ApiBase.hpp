@@ -21,9 +21,24 @@ namespace Audijo
 
 	struct ChannelInfo
 	{
+		/**
+		 * Channel name
+		 */
 		std::string name;
+
+		/**
+		 * Part of group
+		 */
 		long group;
+
+		/**
+		 * Channel is active
+		 */
 		bool active;
+
+		/**
+		 * Channel is input
+		 */
 		bool input;
 	};
 
@@ -86,7 +101,7 @@ namespace Audijo
 		/** 
 		 * Buffer size 
 		 */
-		int bufferSize = 256;
+		int bufferSize = Default;
 
 		/** 
 		 * Sample rate 
@@ -94,7 +109,7 @@ namespace Audijo
 		double sampleRate = Default;
 
 		/**
-		 * Allow resampling when chosen samplerate is not available.
+		 * Allow resampling when chosen samplerate is not available
 		 */
 		bool resampling = true;
 	};

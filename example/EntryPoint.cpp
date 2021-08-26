@@ -14,7 +14,12 @@ int main()
 					output[j][i] = std::sin(_counter * 0.01) * 0.5;
 		});
 
-	_stream.OpenStream({ .input = NoDevice, .output = Default, .bufferSize = Default, .sampleRate = Default });
+	_stream.OpenStream({ 
+		.input = NoDevice, 
+		.output = Default, 
+		.bufferSize = Default, 
+		.sampleRate = Default });
+
 	_stream.StartStream();
 	while (true);
 	

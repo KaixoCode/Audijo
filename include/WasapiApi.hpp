@@ -7,9 +7,13 @@ namespace Audijo
 	template<>
 	struct DeviceInfo<Wasapi> : public DeviceInfo<>
 	{
+
+	private:
 		DeviceInfo(DeviceInfo<>&& d)
 			: DeviceInfo<>{ std::forward<DeviceInfo<>>(d) }
 		{}
+
+		friend class WasapiApi;
 	};
 
 	class WasapiApi : public ApiBase
