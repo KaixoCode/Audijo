@@ -193,13 +193,6 @@ namespace Audijo
 
 	unsigned int ApiBase::FormatBytes(SampleFormat format)
 	{
-		if (format == Int16)
-			return 2;
-		else if (format == Int32 || format == Float32)
-			return 4;
-		else if (format == Float64)
-			return 8;
-
-		return 0;
+		return format & 0xF;
 	}
 }

@@ -124,6 +124,12 @@ namespace Audijo
 		template<typename T>
 		void UserData(T& data) { m_Api->UserData(data); };
 
+		/**
+		 * Get this Stream object as a specific api, to expose api specific functions.
+		 */
+		template<Api api>
+		Stream<api>& Get() { return *(Stream<api>*)this; }
+
 	protected:
 		std::unique_ptr<ApiBase> m_Api;
 	};

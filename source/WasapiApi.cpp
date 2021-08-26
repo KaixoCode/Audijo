@@ -3,7 +3,55 @@
 namespace Audijo
 {
 
-#define CHECK(x, msg, type) if (FAILED(x)) { LOGL(msg); type; }
+#define CHECK(x, msg, type) if (HRESULT hr = FAILED(x)) { LOGL(msg << " code:" << hr); type; }
+
+	template <typename T> 
+	class CircularBuffer {
+	private:
+		std::unique_ptr<T[]> m_Buffer; 
+
+		size_t m_Head = 0;             
+		size_t m_Tail = 0;
+		size_t m_Count = 0;
+		size_t m_MaxSize;
+		T m_EmptyItem = 0;
+	public:
+
+		CircularBuffer(size_t max_size)
+			: m_Buffer(std::unique_ptr<T[]>(new T[max_size])), m_MaxSize(max_size) {};
+
+		void Enqueue(T item) 
+		{
+			if (IsFull())
+				Dequeue();
+
+			m_Buffer[m_Tail] = item;
+			m_Tail = (m_Tail + 1) % m_MaxSize;
+			m_Count++;
+		}
+
+		T Dequeue() 
+		{
+			if (IsEmpty())
+				return m_EmptyItem;
+
+			T item = m_Buffer[m_Head];
+			m_Buffer[m_Head] = m_EmptyItem;
+			m_Head = (m_Head + 1) % m_MaxSize;
+			m_Count--;
+			return item;
+		}
+
+		auto Front() { return m_Buffer[m_Head]; }
+		bool IsEmpty() { return m_Count == 0; }
+		bool IsFull() { return m_Count == m_MaxSize; }
+		int Space() { return m_MaxSize - m_Count - 1; }
+
+		size_t Size() 
+		{
+			return m_Count;
+		}
+	};
 
 	WasapiApi::WasapiApi()
 		: ApiBase()
@@ -303,7 +351,6 @@ namespace Audijo
 		if (m_State == Running)
 			return AlreadyRunning;
 
-		// TODO Start stream
 		m_State = Running;
 		m_AudioThread = std::thread{ [this]()
 			{
@@ -315,34 +362,25 @@ namespace Audijo
 				int _bufferSize = m_Settings.bufferSize;
 				auto _sampleRate = m_Settings.sampleRate;
 				auto _inFormat = m_Settings.m_DeviceInFormat;
-				bool _inSwap = m_Settings.m_InByteSwap;
 				auto _outFormat = m_Settings.m_DeviceOutFormat;
-				bool _outSwap = m_Settings.m_OutByteSwap;
 				auto _format = m_Settings.m_Format;
 				char** _inputs = m_InputBuffers;
 				char** _outputs = m_OutputBuffers;
 
+				auto _captureEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 				auto _renderEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-				// uffer is buffersize * bytes in out format
-				unsigned int _tRingBufSize = 4 * _bufferSize * (_inFormat & 0xF);
-				unsigned int _tRingBufIndex = 0;
-				unsigned int _tRingBufRead = 0;
-				unsigned int _tRingBufAvail = 0;
-				char* _tempRingBuffer = new char[_tRingBufSize];
-				char* _tempInBuffer = new char[_bufferSize * (_inFormat & 0xF)];
-				char* _tempOutBuffer = new char[_bufferSize * (_outFormat & 0xF)];
+				CircularBuffer<char> _inRingBuffer{ (size_t)(4 * _bufferSize * _nInChannels * FormatBytes(_inFormat)) };
+				CircularBuffer<char> _outRingBuffer{ (size_t)(4 * _bufferSize * _nOutChannels * FormatBytes(_outFormat)) };
 
-				unsigned int _inputFrameCount = 0;
 				unsigned int _inputFramesAvailable = 0;
-				unsigned int _outputFrameCount = 0;
 				unsigned int _outputFramesAvailable = 0;
-				unsigned int _framesAvailable = 0;
 				unsigned int _framePadding = 0;
 				DWORD _inFlags = 0;
-				DWORD _outFlags = 0;
 				BYTE* _deviceInputBuffer = nullptr;
 				BYTE* _deviceOutputBuffer = nullptr;
+				bool _pulled = false;
+				bool _pushed = false;
 
 				Pointer<WAVEFORMATEX> _inWaveFormat;
 				if (m_InputClient)
@@ -351,12 +389,10 @@ namespace Audijo
 					m_InputClient.Release();
 					CHECK(m_InputDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)&m_InputClient), "Unable to retrieve device audio client.", return NoError);
 					CHECK(m_InputClient->GetMixFormat(&_inWaveFormat), "Unable to retrieve device mix format.", return NoError);
-					double time = 4 * _bufferSize * (1.0 / _sampleRate) * 10000000;
-					CHECK(m_InputClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, time, 0, _inWaveFormat, nullptr), "Unable to initialize the output client", return NoError);
+					CHECK(m_InputClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, _inWaveFormat, nullptr), "Unable to initialize the output client", return NoError);
 					CHECK(m_InputClient->GetService(__uuidof(IAudioCaptureClient), (void**)&m_CaptureClient), "Unable to retrieve the render client.", return NoError);
-					
+					CHECK(m_InputClient->SetEventHandle(_captureEvent), "Unable to set output event handle", return NoError);
 					CHECK(m_InputClient->Start(), "Couldn't start the device", return NoError);
-					m_InputClient->GetBufferSize(&_inputFrameCount);
 				}
 				
 				Pointer<WAVEFORMATEX> _outWaveFormat;
@@ -366,121 +402,117 @@ namespace Audijo
 					m_OutputClient.Release();
 					CHECK(m_OutputDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)&m_OutputClient), "Unable to retrieve device audio client.", return NoError);
 					CHECK(m_OutputClient->GetMixFormat(&_outWaveFormat), "Unable to retrieve device mix format.", return NoError);
-					double time = 4 * _bufferSize * (1.0 / _sampleRate) * 10000000;
 					CHECK(m_OutputClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK, 0, 0, _outWaveFormat, nullptr), "Unable to initialize the output client", return NoError);
 					CHECK(m_OutputClient->GetService(__uuidof(IAudioRenderClient), (void**)&m_RenderClient), "Unable to retrieve the render client.", return NoError);
-					m_OutputClient->SetEventHandle(_renderEvent);
-
+					CHECK(m_OutputClient->SetEventHandle(_renderEvent), "Unable to set output event handle", return NoError);
 					CHECK(m_OutputClient->Start(), "Couldn't start the device", return NoError);
-					m_OutputClient->GetBufferSize(&_outputFrameCount);					
 				}
-				
+
 				while (m_State == Running)
 				{
-					WaitForSingleObject(_renderEvent, INFINITE);
+					// If not pulled from input buffer
+					if (!_pulled)
+					{
+						if (m_InputClient)
+						{
+							// Only pull if the ring buffer contains enough samples to fill the user buffer
+							if (_inRingBuffer.Size() >= _bufferSize * _nInChannels * FormatBytes(_inFormat))
+							{
+								// Get samples from ring buffer
+								for (int i = 0; i < _bufferSize * FormatBytes(_inFormat); i++)
+									for (int j = 0; j < _nInChannels; j++)
+										_inputs[j][i] = _inRingBuffer.Dequeue();
+								
+								// Convert to the right format
+								for (int j = 0; j < _nInChannels; j++)
+									ConvertBuffer(_inputs[j], _inputs[j], _bufferSize, _format, _inFormat);
 
-					// Get the input buffer + nmr of available frames.
+								_pulled = true;
+							}
+						}
+
+						// If no input device, we don't need to pull, so set to true
+						else
+							_pulled = true;
+						
+						// If data pull from input ring buffer was successful, we can call the callback with the data. 
+						if (_pulled)
+							m_Callback->Call((void**)_inputs, (void**)_outputs, 
+								CallbackInfo{ _nInChannels, _nOutChannels, _bufferSize, _sampleRate }, m_UserData);
+					}
+
+					// If we've pull, it means the callback was called, so we need to handle the user output buffer
+					if (m_OutputClient && _pulled)
+					{
+						// First convert to the right format
+						for (int j = 0; j < _nOutChannels; j++)
+							ConvertBuffer(_outputs[j], _outputs[j], _bufferSize, _outFormat, _format);
+
+						// Then add it to the output ring buffer
+						for (int i = 0; i < _bufferSize * FormatBytes(_outFormat); i++)
+							for (int j = 0; j < _nOutChannels; j++)
+								_outRingBuffer.Enqueue(_outputs[j][i]);
+
+						_pushed = true;
+					}
+
+					// If no output device, we don't need to push, so set to true
+					else
+						_pushed = true;
+
+					// If there is an input device, we'll get data from its buffer into the input ring buffer
 					if (m_InputClient)
 					{
-						CHECK(m_CaptureClient->GetBuffer(&_deviceInputBuffer, &_inputFramesAvailable, &_inFlags, nullptr, nullptr), "Failed to get input buffer.", break);
+						if (!_pulled)
+							WaitForSingleObject(_captureEvent, INFINITE);
 
-						for (int i = 0; i < _inputFramesAvailable; i++)
+						// Get the buffer from the device
+						CHECK(m_CaptureClient->GetBuffer(&_deviceInputBuffer, &_inputFramesAvailable, &_inFlags, nullptr, nullptr), "Failed to retrieve input buffer.", return NoError);
+
+						// If there is enough space in the input ring buffer, we'll enqueue it.
+						if (_inRingBuffer.Space() >= _inputFramesAvailable * _nInChannels * FormatBytes(_inFormat))
 						{
-							for (int j = 0; j < _nInChannels; j++)
-							{
-								((float*)_tempRingBuffer)[_tRingBufIndex] = ((float*)_deviceInputBuffer)[i * _nInChannels + j];
+							// Add the input data to the input ring buffer
+							for (int i = 0; i < _inputFramesAvailable * _nInChannels * FormatBytes(_inFormat); i++)
+								_inRingBuffer.Enqueue(_deviceInputBuffer[i]);
 
-								_tRingBufIndex++;
-							}
-
-							_tRingBufAvail++;
+							CHECK(m_CaptureClient->ReleaseBuffer(_inputFramesAvailable), "Unable to release capture buffer", return NoError);
 						}
-						_inputFramesAvailable = _bufferSize * (_tRingBufAvail / _bufferSize);
+
+						// Otherwise let wasapi know we haven't handled the buffer
+						else
+							CHECK(m_CaptureClient->ReleaseBuffer(0), "Unable to release capture buffer", return NoError);
 					}
 
+					// If there is an output device, we can push our ringbuffer to the device.
 					if (m_OutputClient)
 					{
-						// See how much buffer space is available.
-						CHECK(m_OutputClient->GetCurrentPadding(&_framePadding), "Failed to get current frame padding", break);
-						_outputFramesAvailable = _outputFrameCount - _framePadding;
-						if (m_InputClient)
-							_framesAvailable = std::min(_inputFramesAvailable, _outputFramesAvailable);
-						else
-							_framesAvailable = _outputFramesAvailable;
+						if (_pulled && !_pushed)
+							WaitForSingleObject(_renderEvent, INFINITE);
 
-						_framesAvailable = _bufferSize * (_framesAvailable / _bufferSize);
-					
-						// Get the output buffer to fill
-						CHECK(m_RenderClient->GetBuffer(_framesAvailable, &_deviceOutputBuffer), "Failed to get output buffer", break);
-					}
-					else
-						_framesAvailable = _inputFramesAvailable;
+						// Calculate the amount of frames available to write to.
+						CHECK(m_OutputClient->GetBufferSize(&_outputFramesAvailable), "Unable to retrieve output buffer size", return NoError);
+						CHECK(m_OutputClient->GetCurrentPadding(&_framePadding), "Unable to retrieve output frame padding", return NoError);
+						_outputFramesAvailable -= _framePadding;
 
-					_tRingBufAvail -= _framesAvailable;
-
-					for (int i = 0; i < _framesAvailable / _bufferSize; i++)
-					{
-						for (int c = 0; c < _nInChannels; c++)
+						// If we have enough data to  write to the device in the output ring buffer
+						if (_outRingBuffer.Size() >= _outputFramesAvailable * _nOutChannels * FormatBytes(_outFormat))
 						{
-							for (int j = 0; j < _bufferSize; j++)
-							{
-								int _index = (_tRingBufRead + (j * _nInChannels + c)) % _tRingBufSize;
-								((float*)_tempInBuffer)[j] = ((float*)_tempRingBuffer)[_index];
-							}
+							// Get the buffer
+							CHECK(m_RenderClient->GetBuffer(_outputFramesAvailable, &_deviceOutputBuffer), "Failed to retrieve output buffer.", return NoError);
 
-							ConvertBuffer(_inputs[c], _tempInBuffer, _bufferSize, _format, _inFormat);
-						}
+							// Put data in the output device buffer
+							for (int i = 0; i < _outputFramesAvailable * _nOutChannels * FormatBytes(_outFormat); i++)
+								_deviceOutputBuffer[i] = _outRingBuffer.Dequeue();
 
-						_tRingBufRead = (_tRingBufRead + _bufferSize * _nInChannels) % _tRingBufSize;
-
-						m_Callback->Call((void**)_inputs, (void**)_outputs, CallbackInfo{
-							_nInChannels, _nOutChannels, _bufferSize, _sampleRate
-							}, m_UserData);
-						
-						for (int c = 0; c < _nOutChannels; c++)
-						{
-							ConvertBuffer(_tempOutBuffer, _outputs[c], _bufferSize, _outFormat, _format);
-							for (int j = 0; j < _bufferSize; j++)
-							{
-								//   index = frame * size of buffer          + index in buffer
-								int _index = i * _bufferSize * _nOutChannels + (j * _nOutChannels + c);
-								((float*)_deviceOutputBuffer)[_index] = ((float*)_tempOutBuffer)[j];
-							}
+							CHECK(m_RenderClient->ReleaseBuffer(_outputFramesAvailable, 0), "Unable to release capture buffer", return NoError);
 						}
 					}
 
-					// Release buffers
-					if (m_InputClient) CHECK(m_CaptureClient->ReleaseBuffer(_inputFramesAvailable), "Failed to release the input buffer", break);
-					if (m_OutputClient) CHECK(m_RenderClient->ReleaseBuffer(_framesAvailable, 0), "Failed to release the output buffer", break);
-					//// Prepare the input buffer
-					//for (int i = 0; i < _nInChannels; i++)
-					//{
-					//	int index = 
-					//	char* _temp = (char*)m_BufferInfos[i].buffers[doubleBufferIndex];
-					//	if (_inSwap)
-					//		m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _inFormat);
-					//	m_AsioApi->ConvertBuffer(_inputs[i], _temp, _bufferSize, _inFormat, _format);
-					//}
-
-					//// usercallback
-					//m_AsioApi->m_Callback->Call((void**)_inputs, (void**)_outputs, CallbackInfo{
-					//	_nInChannels, _nOutChannels, _bufferSize, _sampleRate
-					//	}, m_AsioApi->m_UserData);
-
-					//// Convert the output buffer
-					//for (int i = 0; i < _nOutChannels; i++)
-					//{
-					//	char* _temp = (char*)m_BufferInfos[i + _nOutChannels].buffers[doubleBufferIndex];
-					//	m_AsioApi->ConvertBuffer(_temp, _outputs[i], _bufferSize, _outFormat, _format);
-					//	if (_outSwap)
-					//		m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _outFormat);
-					//}
-
+					// If data has been pushed, let the device know we can pull again.
+					if (_pushed)
+						_pulled = false;
 				}
-				
-
-				delete[] _tempInBuffer;
-				delete[] _tempOutBuffer;
 			}
 		};
 

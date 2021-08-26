@@ -4,7 +4,7 @@ using namespace Audijo;
 
 int main()
 {
-    //Stream<Asio> _stream;
+	//Stream _stream{ Asio };
 
 	//_stream.SetCallback([&](double** input, double** output, CallbackInfo info)
 	//	{   // generate a simple sinewave
@@ -13,7 +13,7 @@ int main()
 	//			for (int j = 0; j < info.outputChannels; j++)
 	//				output[j][i] = std::sin(_counter * 0.01) * 0.5;
 	//	});
-	
+	//
 	//StreamSettings _settings;
 	//_settings.bufferSize = 256;
 	//_settings.sampleRate = 44100;
@@ -21,7 +21,7 @@ int main()
 	//_stream.OpenStream(_settings);
 	//_stream.StartStream();
 
-	//_stream.OpenControlPanel();
+	//_stream.Get<Asio>().OpenControlPanel();
 	//while (true);
 
 	Stream<Wasapi> _stream;
@@ -39,15 +39,17 @@ int main()
 			LOG(i << ", ");
 		LOGL("");
 	}
-	_stream.SetCallback([&](double** input, double** output, CallbackInfo info)
+	_stream.SetCallback([&](float** input, float** output, CallbackInfo info)
 		{   
-			memcpy(input, output, info.bufferSize * info.inputChannels);
-			
+			for (int i = 0; i < info.bufferSize; i++)
+				for (int j = 0; j < info.outputChannels; j++)
+					output[j][i] = input[j][i];
+
 			//// generate a simple sinewave
 			//static int _counter = 0;
 			//for (int i = 0; i < info.bufferSize; i++, _counter++)
 			//	for (int j = 0; j < info.outputChannels; j++)
-			//		output[j][i] = std::sin(_counter * 0.01) * 0.5;
+			//		output[j][i] += std::sin(_counter * 0.01) * 0.5;
 		});
 
 	_stream.OpenStream();
