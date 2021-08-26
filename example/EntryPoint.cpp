@@ -41,9 +41,14 @@ int main()
 	}
 	_stream.SetCallback([&](double** input, double** output, CallbackInfo info)
 		{   // Forward the input audio to the output
-			for (int i = 0; i < info.bufferSize; i++)
-				for (int j = 0; j < std::min(info.outputChannels, info.inputChannels); j++)
-					output[j][i] = input[j][i];
+			//for (int i = 0; i < info.bufferSize; i++)
+			//	for (int j = 0; j < std::min(info.outputChannels, info.inputChannels); j++)
+			//		output[j][i] = input[j][i];
+
+			static int _counter = 0;
+			for (int i = 0; i < info.bufferSize; i++, _counter++)
+				for (int j = 0; j < info.outputChannels; j++)
+					output[j][i] = std::sin(_counter * 0.01) * 0.5;
 		});
 
 	StreamSettings _settings;
@@ -53,7 +58,8 @@ int main()
 	_stream.OpenStream(_settings);
 	_stream.StartStream();
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+	while (true);
+	std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 
 	_stream.CloseStream();
 }

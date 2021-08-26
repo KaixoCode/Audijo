@@ -337,6 +337,7 @@ namespace Audijo
 
 				auto _captureEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 				auto _renderEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+				HANDLE _events[2]{ _captureEvent, _renderEvent };
 
 				unsigned int _inputFramesAvailable = 0;
 				unsigned int _outputFramesAvailable = 0;
@@ -345,6 +346,16 @@ namespace Audijo
 				BYTE* _streamBuffer = nullptr;
 				bool _pulled = false;
 				bool _pushed = false;
+
+				unsigned int _tries = 0;
+			Retry:
+				_tries++;
+				if (_tries > 100)
+				{
+					LOGL("Too many retries to prevent underruns");
+					return;
+				}
+				unsigned int _underruns = 0;
 
 				// Initialize input device
 				if (m_InputClient)
@@ -450,14 +461,27 @@ namespace Audijo
 					else
 						_pushed = true;
 
-					// If there is an input device, we'll get data from its buffer into the input ring buffer
-					if (m_InputClient)
-					{
-						if (!_pulled)
-							WaitForSingleObject(_captureEvent, INFINITE);
+					// Wait for one of the events
+					auto _handled = WaitForMultipleObjects(2, _events, false, INFINITE);
 
+					// If there is an input device, we'll get data from its buffer into the input ring buffer
+					if (m_InputClient && _handled == WAIT_OBJECT_0)
+					{
 						// Get the buffer from the device
 						CHECK(m_CaptureClient->GetBuffer(&_streamBuffer, &_inputFramesAvailable, &_flags, nullptr, nullptr), "Failed to retrieve input buffer.", goto Cleanup);
+
+						if (_flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY)
+						{
+							_underruns++;
+							if (_underruns > 10)
+							{
+								std::cout << "Detected 10 underruns, reconnecting..." << std::endl;
+								if (m_OutputClient) m_OutputClient->Stop();
+								m_InputClient->Stop();
+								std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 50 + 200));
+								goto Retry;
+							}
+						}
 
 						// If there is enough space in the input ring buffer, we'll enqueue it.
 						if (_inRingBuffer.Space() >= _inputFramesAvailable * _nInChannels * FormatBytes(_inFormat))
@@ -475,11 +499,8 @@ namespace Audijo
 					}
 
 					// If there is an output device, we can push our ringbuffer to the device.
-					if (m_OutputClient)
+					if (m_OutputClient && _handled == WAIT_OBJECT_0 + 1)
 					{
-						if (_pulled && !_pushed)
-							WaitForSingleObject(_renderEvent, INFINITE);
-
 						// Calculate the amount of frames available to write to.
 						CHECK(m_OutputClient->GetBufferSize(&_outputFramesAvailable), "Unable to retrieve output buffer size", goto Cleanup);
 						CHECK(m_OutputClient->GetCurrentPadding(&_framePadding), "Unable to retrieve output frame padding", goto Cleanup);
