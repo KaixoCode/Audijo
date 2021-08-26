@@ -19,8 +19,16 @@ set(INCLUDE_DIRS
 option(AUDIJO_BUILD_DOCS "Build Docs" OFF)
 option(AUDIJO_BUILD_EXAMPLE "Build Example" ON)
 option(AUDIJO_USE_ASIO "Build ASIO API" ON)
+option(AUDIJO_USE_WASAPI "Build WASAPI API" ON)
+
+
+if(AUDIJO_USE_WASAPI)
+add_definitions(-DAUDIJO_WASAPI)
+endif()
 
 if(AUDIJO_USE_ASIO)
+add_definitions(-DAUDIJO_ASIO)
+
 # We require some sdks
 FIND_PACKAGE(ASIOSDK REQUIRED)
 

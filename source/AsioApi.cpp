@@ -1,3 +1,4 @@
+#ifdef AUDIJO_ASIO
 #include "AsioApi.hpp"
 
 /**
@@ -478,3 +479,4 @@ namespace Audijo
 	AsioApi* AsioApi::m_AsioApi = nullptr;
 	AsioApi::State AsioApi::m_State = Loaded;
 }
+#endif

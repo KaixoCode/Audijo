@@ -79,7 +79,7 @@ namespace Audijo
 			case Int32:   ConvertBufferTyped<int8_t, int32_t>(outBuffer, inBuffer, bufferSize); break;
 			case Float32: ConvertBufferTyped<int8_t, float>(outBuffer, inBuffer, bufferSize); break;
 			case Float64: ConvertBufferTyped<int8_t, double>(outBuffer, inBuffer, bufferSize); break;
-			default: memcpy(outBuffer, inBuffer, bufferSize);
+			default: std::copy(inBuffer, inBuffer + bufferSize, outBuffer);
 			} break;
 		case Int16:
 			switch (outFormat)
@@ -88,7 +88,7 @@ namespace Audijo
 			case Int32:   ConvertBufferTyped<int16_t, int32_t>(outBuffer, inBuffer, bufferSize); break;
 			case Float32: ConvertBufferTyped<int16_t, float>(outBuffer, inBuffer, bufferSize); break;
 			case Float64: ConvertBufferTyped<int16_t, double>(outBuffer, inBuffer, bufferSize); break;
-			default: memcpy(outBuffer, inBuffer, bufferSize * 2);
+			default: std::copy(inBuffer, inBuffer + 2 * bufferSize, outBuffer);
 			} break;
 		case Int32:
 			switch (outFormat)
@@ -97,7 +97,7 @@ namespace Audijo
 			case Int16:   ConvertBufferTyped<int32_t, int16_t>(outBuffer, inBuffer, bufferSize); break;
 			case Float32: ConvertBufferTyped<int32_t, float>(outBuffer, inBuffer, bufferSize); break;
 			case Float64: ConvertBufferTyped<int32_t, double>(outBuffer, inBuffer, bufferSize); break;
-			default: memcpy(outBuffer, inBuffer, bufferSize * 4);
+			default: std::copy(inBuffer, inBuffer + 4 * bufferSize, outBuffer);
 			} break;
 		case Float32:
 			switch (outFormat)
@@ -106,7 +106,7 @@ namespace Audijo
 			case Int16:   ConvertBufferTyped<float, int16_t>(outBuffer, inBuffer, bufferSize); break;
 			case Int32:   ConvertBufferTyped<float, int32_t>(outBuffer, inBuffer, bufferSize); break;
 			case Float64: ConvertBufferTyped<float, double>(outBuffer, inBuffer, bufferSize); break;
-			default: memcpy(outBuffer, inBuffer, bufferSize * 4);
+			default: std::copy(inBuffer, inBuffer + 4 * bufferSize, outBuffer);
 			} break;
 		case Float64:
 			switch (outFormat)
@@ -115,7 +115,7 @@ namespace Audijo
 			case Int16:   ConvertBufferTyped<double, int16_t>(outBuffer, inBuffer, bufferSize); break;
 			case Int32:   ConvertBufferTyped<double, int32_t>(outBuffer, inBuffer, bufferSize); break;
 			case Float32: ConvertBufferTyped<double, float>(outBuffer, inBuffer, bufferSize); break;
-			default: memcpy(outBuffer, inBuffer, bufferSize * 8);
+			default: std::copy(inBuffer, inBuffer + 8 * bufferSize, outBuffer);
 			} break;
 		}
 	}

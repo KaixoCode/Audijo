@@ -39,21 +39,22 @@ int main()
 			LOG(i << ", ");
 		LOGL("");
 	}
-	_stream.SetCallback([&](float** input, float** output, CallbackInfo info)
-		{   
+	_stream.SetCallback([&](double** input, double** output, CallbackInfo info)
+		{   // Forward the input audio to the output
 			for (int i = 0; i < info.bufferSize; i++)
-				for (int j = 0; j < info.outputChannels; j++)
+				for (int j = 0; j < std::min(info.outputChannels, info.inputChannels); j++)
 					output[j][i] = input[j][i];
-
-			//// generate a simple sinewave
-			//static int _counter = 0;
-			//for (int i = 0; i < info.bufferSize; i++, _counter++)
-			//	for (int j = 0; j < info.outputChannels; j++)
-			//		output[j][i] += std::sin(_counter * 0.01) * 0.5;
 		});
 
-	_stream.OpenStream();
+	StreamSettings _settings;
+	_settings.bufferSize = 256;
+	_settings.sampleRate = 48000;
+	_settings.input.deviceId = DefaultDevice;
+	_settings.output.deviceId = DefaultDevice;
+	_stream.OpenStream(_settings);
 	_stream.StartStream();
 
-	while (true);
+	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+	_stream.CloseStream();
 }

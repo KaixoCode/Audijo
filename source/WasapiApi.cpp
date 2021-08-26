@@ -1,16 +1,16 @@
+#ifdef AUDIJO_WASAPI
 #include "WasapiApi.hpp"
 
 namespace Audijo
 {
-
-#define CHECK(x, msg, type) if (HRESULT hr = FAILED(x)) { LOGL(msg << " code:" << hr); type; }
+#define CHECK(x, msg, type) if (FAILED(x)) { LOGL(msg); type; }
 
 	template <typename T> 
 	class CircularBuffer {
 	private:
-		std::unique_ptr<T[]> m_Buffer; 
+		T* m_Buffer; 
 
-		size_t m_Head = 0;             
+		size_t m_Head = 0;
 		size_t m_Tail = 0;
 		size_t m_Count = 0;
 		size_t m_MaxSize;
@@ -18,7 +18,9 @@ namespace Audijo
 	public:
 
 		CircularBuffer(size_t max_size)
-			: m_Buffer(std::unique_ptr<T[]>(new T[max_size])), m_MaxSize(max_size) {};
+			: m_Buffer(new T[max_size]), m_MaxSize(max_size) {};
+
+		~CircularBuffer() { delete[] m_Buffer; }
 
 		void Enqueue(T item) 
 		{
@@ -46,11 +48,7 @@ namespace Audijo
 		bool IsEmpty() { return m_Count == 0; }
 		bool IsFull() { return m_Count == m_MaxSize; }
 		int Space() { return m_MaxSize - m_Count - 1; }
-
-		size_t Size() 
-		{
-			return m_Count;
-		}
+		size_t Size() { return m_Count; }
 	};
 
 	WasapiApi::WasapiApi()
@@ -254,7 +252,10 @@ namespace Audijo
 
 			// Otherwise check samplerate
 			else if (_inFormat->nSamplesPerSec != _sampleRate)
+			{
+				LOGL("Invalid sample rate selected");
 				return InvalidSampleRate;
+			}
 
 			// Set native sample format
 			if (_inFormat->wFormatTag == WAVE_FORMAT_IEEE_FLOAT || (_inFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
@@ -294,7 +295,10 @@ namespace Audijo
 
 			// If invalid samplerate and was valid for input device, it's invalid duplex because no support for resampling.
 			if (_outFormat->nSamplesPerSec != _sampleRate)
+			{
+				LOGL("Invalid sample rate selected");
 				return _inDeviceId != -1 ? InvalidDuplex : InvalidSampleRate;
+			}
 
 			// Set native sample format
 			if (_outFormat->wFormatTag == WAVE_FORMAT_IEEE_FLOAT || (_outFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
@@ -356,6 +360,16 @@ namespace Audijo
 			{
 				CHECK(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED), "Failed to CoInitialize thread.", return NoError);
 
+				HMODULE AvrtDll = LoadLibraryW(L"AVRT.dll");
+				if (AvrtDll) {
+					typedef HANDLE(__stdcall* TAvSetMmThreadCharacteristicsPtr)(LPCWSTR TaskName, LPDWORD TaskIndex);
+					DWORD taskIndex = 0;
+					TAvSetMmThreadCharacteristicsPtr AvSetMmThreadCharacteristicsPtr =
+						(TAvSetMmThreadCharacteristicsPtr)(void(*)()) GetProcAddress(AvrtDll, "AvSetMmThreadCharacteristicsW");
+					AvSetMmThreadCharacteristicsPtr(L"Pro Audio", &taskIndex);
+					FreeLibrary(AvrtDll);
+				}
+
 				// Retrieve information from object
 				int _nInChannels = m_Settings.input.channels;
 				int _nOutChannels = m_Settings.output.channels;
@@ -367,11 +381,16 @@ namespace Audijo
 				char** _inputs = m_InputBuffers;
 				char** _outputs = m_OutputBuffers;
 
+				char** _tempInBuff = new char*[_nInChannels];
+				for (int i = 0; i < _nInChannels; i++)
+					_tempInBuff[i] = new char[_bufferSize * FormatBytes(_inFormat)];
+
+				char** _tempOutBuff = new char*[_nOutChannels];
+				for (int i = 0; i < _nOutChannels; i++)
+					_tempOutBuff[i] = new char[_bufferSize * FormatBytes(_outFormat)];
+
 				auto _captureEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 				auto _renderEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-
-				CircularBuffer<char> _inRingBuffer{ (size_t)(4 * _bufferSize * _nInChannels * FormatBytes(_inFormat)) };
-				CircularBuffer<char> _outRingBuffer{ (size_t)(4 * _bufferSize * _nOutChannels * FormatBytes(_outFormat)) };
 
 				unsigned int _inputFramesAvailable = 0;
 				unsigned int _outputFramesAvailable = 0;
@@ -393,6 +412,7 @@ namespace Audijo
 					CHECK(m_InputClient->GetService(__uuidof(IAudioCaptureClient), (void**)&m_CaptureClient), "Unable to retrieve the render client.", return NoError);
 					CHECK(m_InputClient->SetEventHandle(_captureEvent), "Unable to set output event handle", return NoError);
 					CHECK(m_InputClient->Start(), "Couldn't start the device", return NoError);
+					CHECK(m_InputClient->GetBufferSize(&_inputFramesAvailable), "Unable to retrieve output buffer size", return NoError);
 				}
 				
 				Pointer<WAVEFORMATEX> _outWaveFormat;
@@ -406,7 +426,11 @@ namespace Audijo
 					CHECK(m_OutputClient->GetService(__uuidof(IAudioRenderClient), (void**)&m_RenderClient), "Unable to retrieve the render client.", return NoError);
 					CHECK(m_OutputClient->SetEventHandle(_renderEvent), "Unable to set output event handle", return NoError);
 					CHECK(m_OutputClient->Start(), "Couldn't start the device", return NoError);
+					CHECK(m_OutputClient->GetBufferSize(&_outputFramesAvailable), "Unable to retrieve output buffer size", return NoError);
 				}
+
+				CircularBuffer<char> _inRingBuffer{ (size_t)((_bufferSize + _inputFramesAvailable) * _nInChannels * FormatBytes(_inFormat)) };
+				CircularBuffer<char> _outRingBuffer{ (size_t)((_bufferSize + _outputFramesAvailable) * _nOutChannels * FormatBytes(_outFormat)) };
 
 				while (m_State == Running)
 				{
@@ -419,13 +443,14 @@ namespace Audijo
 							if (_inRingBuffer.Size() >= _bufferSize * _nInChannels * FormatBytes(_inFormat))
 							{
 								// Get samples from ring buffer
-								for (int i = 0; i < _bufferSize * FormatBytes(_inFormat); i++)
+								for (int i = 0; i < _bufferSize; i++)
 									for (int j = 0; j < _nInChannels; j++)
-										_inputs[j][i] = _inRingBuffer.Dequeue();
-								
+										for (int k = 0; k < FormatBytes(_inFormat); k++)
+											_tempInBuff[j][i * FormatBytes(_inFormat) + k] = _inRingBuffer.Dequeue();
+
 								// Convert to the right format
 								for (int j = 0; j < _nInChannels; j++)
-									ConvertBuffer(_inputs[j], _inputs[j], _bufferSize, _format, _inFormat);
+									ConvertBuffer(_inputs[j], _tempInBuff[j], _bufferSize, _format, _inFormat);
 
 								_pulled = true;
 							}
@@ -444,16 +469,22 @@ namespace Audijo
 					// If we've pull, it means the callback was called, so we need to handle the user output buffer
 					if (m_OutputClient && _pulled)
 					{
-						// First convert to the right format
-						for (int j = 0; j < _nOutChannels; j++)
-							ConvertBuffer(_outputs[j], _outputs[j], _bufferSize, _outFormat, _format);
-
-						// Then add it to the output ring buffer
-						for (int i = 0; i < _bufferSize * FormatBytes(_outFormat); i++)
+						if (_outRingBuffer.Space() >= _bufferSize * _nOutChannels * FormatBytes(_outFormat))
+						{
+							// First convert to the right format
 							for (int j = 0; j < _nOutChannels; j++)
-								_outRingBuffer.Enqueue(_outputs[j][i]);
+								ConvertBuffer(_tempOutBuff[j], _outputs[j], _bufferSize, _outFormat, _format);
 
-						_pushed = true;
+							// Then add it to the output ring buffer
+							for (int i = 0; i < _bufferSize; i++)
+								for (int j = 0; j < _nOutChannels; j++)
+									for (int k = 0; k < FormatBytes(_outFormat); k++)
+										_outRingBuffer.Enqueue(_tempOutBuff[j][i * FormatBytes(_outFormat) + k]);
+
+							_pushed = true;
+						}
+						else
+							_pushed = false;
 					}
 
 					// If no output device, we don't need to push, so set to true
@@ -495,8 +526,8 @@ namespace Audijo
 						CHECK(m_OutputClient->GetCurrentPadding(&_framePadding), "Unable to retrieve output frame padding", return NoError);
 						_outputFramesAvailable -= _framePadding;
 
-						// If we have enough data to  write to the device in the output ring buffer
-						if (_outRingBuffer.Size() >= _outputFramesAvailable * _nOutChannels * FormatBytes(_outFormat))
+						// If we have enough data to write to the device from the output ring buffer
+						if (_outputFramesAvailable != 0 && _outRingBuffer.Size() >= _outputFramesAvailable * _nOutChannels * FormatBytes(_outFormat))
 						{
 							// Get the buffer
 							CHECK(m_RenderClient->GetBuffer(_outputFramesAvailable, &_deviceOutputBuffer), "Failed to retrieve output buffer.", return NoError);
@@ -504,15 +535,27 @@ namespace Audijo
 							// Put data in the output device buffer
 							for (int i = 0; i < _outputFramesAvailable * _nOutChannels * FormatBytes(_outFormat); i++)
 								_deviceOutputBuffer[i] = _outRingBuffer.Dequeue();
-
+							
 							CHECK(m_RenderClient->ReleaseBuffer(_outputFramesAvailable, 0), "Unable to release capture buffer", return NoError);
 						}
+
+						// Otherwise let wasapi know we haven't handled the buffer
+						else
+							CHECK(m_RenderClient->ReleaseBuffer(0, 0), "Unable to release capture buffer", return NoError);
 					}
 
 					// If data has been pushed, let the device know we can pull again.
 					if (_pushed)
 						_pulled = false;
 				}
+
+				for (int i = 0; i < _nInChannels; i++)
+					delete[] _tempInBuff[i];
+				delete[] _tempInBuff;
+
+				for (int i = 0; i < _nOutChannels; i++)
+					delete[] _tempOutBuff[i];
+				delete[] _tempOutBuff;
 			}
 		};
 
@@ -545,10 +588,15 @@ namespace Audijo
 			return NotOpen;
 
 		if (m_State == Running)
-		{
 			StopStream();
-		}
-
+		
+		m_InputDevice.Release();  
+		m_OutputDevice.Release(); 
+		m_InputClient.Release();  
+		m_OutputClient.Release(); 
+		m_CaptureClient.Release();
+		m_RenderClient.Release(); 
 		m_State = Loaded;
 	};
 }
+#endif

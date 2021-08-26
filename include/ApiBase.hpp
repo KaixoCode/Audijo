@@ -64,7 +64,7 @@ namespace Audijo
 	    /**
 		 * Amount of channels
 		 */
-		int channels = DefaultDevice;
+		int channels = -1;
 	};
 
 	struct StreamSettings
@@ -82,7 +82,7 @@ namespace Audijo
 		/** 
 		 * Buffer size 
 		 */
-		int bufferSize = 512;
+		int bufferSize = 256;
 
 		/** 
 		 * Sample rate 
