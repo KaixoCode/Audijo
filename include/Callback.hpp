@@ -1,5 +1,6 @@
 #pragma once
 #include "pch.hpp"
+#include "Buffer.hpp"
 
 namespace Audijo
 {
@@ -43,11 +44,21 @@ namespace Audijo
 	};
 
 	// Get the signature of a lambda's operator()
+	template<typename _Fx, typename = void>
+	struct LambdaSignature;
 	template<typename _Fx>
-	struct LambdaSignature 
+	struct LambdaSignature<_Fx, std::void_t<decltype(&_Fx::operator())>>
 	{
 		using type = typename MemberSignature<decltype(&_Fx::operator())>::type;
 	};
+
+	template<typename T>
+	struct RemoveAllPointers : std::conditional_t<std::is_pointer_v<T>,
+		RemoveAllPointers<std::remove_pointer_t<T>>,std::type_identity<T>>
+	{};
+
+	template<typename T>
+	using RemoveAllPointersT = typename RemoveAllPointers<T>::type;
 
 	// Valid sample formats
 	template<typename Format>
@@ -56,7 +67,12 @@ namespace Audijo
 		|| std::is_same_v<Format, int16_t**>
 		|| std::is_same_v<Format, int32_t**>
 		|| std::is_same_v<Format, float**>
-		|| std::is_same_v<Format, double**>;
+		|| std::is_same_v<Format, double**>
+		|| std::is_same_v<Format, Buffer<int8_t>&>
+		|| std::is_same_v<Format, Buffer<int16_t>&>
+		|| std::is_same_v<Format, Buffer<int32_t>&>
+		|| std::is_same_v<Format, Buffer<float>&>
+		|| std::is_same_v<Format, Buffer<double>&>;
 
 	// Valid callback signature
 	template<typename Ret, typename InFormat, typename OutFormat, typename CI,  typename ...UserData>
@@ -76,7 +92,7 @@ namespace Audijo
 
 	// Callback type
 	template<typename ...Args> requires ValidCallback<int, Args...>
-	using Callback = int(*)(Args...);
+	using Callback = void(*)(Args...);
 
 	/**
 	 * Callback Wrapper base, for type erasure.
@@ -98,33 +114,74 @@ namespace Audijo
 	template<typename Type, typename ...Args> requires ValidCallback<void, Args...>
 	class CallbackWrapper<Type, void(Args...)> : public CallbackWrapperBase
 	{
+		template<typename T>
+		struct IsFloat
+		{
+			constexpr static bool value = std::is_floating_point_v<T>;
+		};
+
+		template<typename T>
+		struct IsFloat<Buffer<T>> : IsFloat<T>
+		{};
+
+		template<typename T>
+		struct TypeSize
+		{
+			constexpr static int value = sizeof(T);
+		};
+
+		template<typename T>
+		struct TypeSize<Buffer<T>> : TypeSize<T>
+		{};
+
 	public:
+
+		using InType = std::remove_reference_t<NthTypeOf<0, Args...>>;
+		using OutType = std::remove_reference_t<NthTypeOf<1, Args...>>;
+
+		constexpr static bool InFloat = IsFloat<RemoveAllPointersT<InType>>::value;
+		constexpr static bool OutFloat = IsFloat<RemoveAllPointersT<OutType>>::value;
+		constexpr static int InSize = TypeSize<RemoveAllPointersT<InType>>::value;
+		constexpr static int OutSize = TypeSize<RemoveAllPointersT<OutType>>::value;
+
 		CallbackWrapper(Type callback)
 			: m_Callback(callback)
 		{}
 
-		int InFormat() override { return (std::is_floating_point_v<std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>> ? 0x10 : 0x00) | sizeof(std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<0, Args...>>>); }
-		int OutFormat() override { return (std::is_floating_point_v<std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<1, Args...>>>> ? 0x10 : 0x00) | sizeof(std::remove_pointer_t<std::remove_pointer_t<NthTypeOf<1, Args...>>>); }
+		int InFormat() override { return (InFloat ? 0x10 : 0x00) | InSize; }
+		int OutFormat() override { return (OutFloat ? 0x10 : 0x00) | OutSize; }
 
 		void Call(void** in, void** out, CallbackInfo&& info, void* userdata) override
 		{
+			InType _in;
+			OutType _out;
+			if constexpr (std::is_class_v<InType>)
+				_in = InType{ reinterpret_cast<InType::Type**>(in), info.inputChannels, info.bufferSize };
+			else
+				_in = reinterpret_cast<InType>(in);
+
+			if constexpr (std::is_class_v<OutType>)
+				_out = OutType{ reinterpret_cast<OutType::Type**>(out), info.outputChannels, info.bufferSize };
+			else
+				_out = reinterpret_cast<OutType>(out);
+
 			if constexpr (sizeof...(Args) == 4)
-				if constexpr (std::is_reference_v<NthTypeOf<2, Args...>>)
+				if constexpr (std::is_reference_v<NthTypeOf<3, Args...>>)
 					m_Callback(
-						reinterpret_cast<NthTypeOf<0, Args...>>(in),
-						reinterpret_cast<NthTypeOf<1, Args...>>(out), 
+						_in,
+						_out, 
 						std::forward<CallbackInfo>(info),
 						*reinterpret_cast<std::remove_reference_t<NthTypeOf<3, Args...>>*>(userdata));
 				else 
 					m_Callback(
-						reinterpret_cast<NthTypeOf<0, Args...>>(in),
-						reinterpret_cast<NthTypeOf<1, Args...>>(out), 
+						_in,
+						_out,
 						std::forward<CallbackInfo>(info),
 						reinterpret_cast<NthTypeOf<3, Args...>>(userdata));
 			else 
 				m_Callback(
-					reinterpret_cast<NthTypeOf<0, Args...>>(in),
-					reinterpret_cast<NthTypeOf<1, Args...>>(out), 
+					_in,
+					_out,
 					std::forward<CallbackInfo>(info));
 		}
 

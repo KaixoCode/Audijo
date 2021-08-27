@@ -2,23 +2,25 @@
 
 using namespace Audijo;
 
+#include <functional>
+
 int main()
 {
-
 	Stream _stream{ Wasapi };
-	_stream.SetCallback([&](float** input, float** output, CallbackInfo info)
-		{   // generate a simple sinewave
-			static int _counter = 0;
-			for (int i = 0; i < info.bufferSize; i++, _counter++)
-				for (int j = 0; j < info.outputChannels; j++)
-					output[j][i] = std::sin(_counter * 0.01) * 0.5;
+
+	_stream.SetCallback([&](Buffer<float>& input, Buffer<float>& output, CallbackInfo info)
+		{   
+			for (auto& _channel : output)
+				for (auto& _sample : _channel)
+					_sample = 0.5 * ((std::rand() % 10000) / 10000. - 0.5);
 		});
 
 	_stream.OpenStream({ 
-		.input = Default, 
+		.input = NoDevice, 
 		.output = Default,
 		.bufferSize = Default, 
-		.sampleRate = Default });
+		.sampleRate = Default 
+	});
 
 	_stream.StartStream();
 

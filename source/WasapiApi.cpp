@@ -195,7 +195,7 @@ namespace Audijo
 				m_Parameters.sampleRate = _sampleRate = _inFormat->nSamplesPerSec;
 
 			// Otherwise check samplerate
-			else if (_inFormat->nSamplesPerSec != _sampleRate)
+			else if (_inFormat->nSamplesPerSec != _sampleRate && !m_Parameters.resampling)
 			{
 				LOGL("Invalid sample rate selected");
 				return InvalidSampleRate;
@@ -238,7 +238,7 @@ namespace Audijo
 				m_Parameters.sampleRate = _sampleRate = _outFormat->nSamplesPerSec;
 
 			// If invalid samplerate and was valid for input device, it's invalid duplex because no support for resampling.
-			if (_outFormat->nSamplesPerSec != _sampleRate)
+			if (_outFormat->nSamplesPerSec != _sampleRate && !m_Parameters.resampling)
 			{
 				LOGL("Invalid sample rate selected");
 				return _inDeviceId != NoDevice ? InvalidDuplex : InvalidSampleRate;
