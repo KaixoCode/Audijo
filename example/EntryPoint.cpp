@@ -15,13 +15,16 @@ int main()
 		});
 
 	_stream.OpenStream({ 
-		.input = NoDevice, 
-		.output = Default, 
+		.input = Default, 
+		.output = Default,
 		.bufferSize = Default, 
 		.sampleRate = Default });
 
 	_stream.StartStream();
-	while (true);
+
+	std::cin.get();
+
+	_stream.CloseStream();
 	
 	
 	//Stream _stream{ Wasapi };

@@ -70,6 +70,8 @@ namespace Audijo
 		Error StopStream() override;
 		Error CloseStream() override;
 
+		Error SetSampleRate(double) override;
+
 	protected:
 		std::vector<DeviceInfo<Wasapi>> m_Devices;
 

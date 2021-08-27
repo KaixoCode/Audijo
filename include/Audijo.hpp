@@ -122,6 +122,17 @@ namespace Audijo
 		void UserData(T& data) { if (m_Api) m_Api->UserData(data); };
 
 		/**
+		 * Set the sample rate of the stream.
+		 * @param srate sample rate
+		 * @return
+		 * NotOpen - If no device is open.
+		 * InvalidSampleRate - If the sample rate is not supported
+		 * Fail - If changing the sample rate at this time is not supported, or general fail.
+		 * NoError - If sample rate successfully changed
+		 */
+		Error SetSampleRate(double srate) { return !m_Api ? NoApi : m_Api->SetSampleRate(srate); };
+
+		/**
 		 * Get this Stream object as a specific api, to expose api specific functions.
 		 */
 		template<Api api>

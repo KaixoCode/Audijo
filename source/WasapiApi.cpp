@@ -554,5 +554,13 @@ namespace Audijo
 		m_RenderClient.Release(); 
 		m_State = Loaded;
 	};
+
+	Error WasapiApi::SetSampleRate(double srate)
+	{
+		if (m_State == Loaded)
+			return NotOpen;
+
+		return Fail;
+	};
 }
 #endif

@@ -34,7 +34,7 @@ namespace Audijo
 
 	class AsioApi : public ApiBase
 	{
-		enum State { Loaded, Initialized, Prepared, Running };
+		enum State { Loaded, Initialized, Prepared, Running, Reset };
 	public:
 		AsioApi();
 		
@@ -47,14 +47,16 @@ namespace Audijo
 		Error StopStream() override;
 		Error CloseStream() override;
 
+		Error SetSampleRate(double) override;
+
 		Error OpenControlPanel();
 
 	protected:
 		std::vector<DeviceInfo<Asio>> m_Devices;
 
-		static void SampleRateDidChange(ASIOSampleRate sRate);
-		static long AsioMessage(long selector, long value, void* message, double* opt);
-		static ASIOTime* BufferSwitchTimeInfo(ASIOTime* params, long doubleBufferIndex, ASIOBool directProcess);
+		static void SampleRateDidChange(ASIOSampleRate);
+		static long AsioMessage(long, long, void*, double*);
+		static ASIOTime* BufferSwitchTimeInfo(ASIOTime*, long, ASIOBool);
 
 		static ASIOCallbacks m_Callbacks;
 		static ASIOBufferInfo* m_BufferInfos;

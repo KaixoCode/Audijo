@@ -408,6 +408,18 @@ namespace Audijo
 		CHECK(ASIODisposeBuffers(), "Failed to dispose buffers", return Fail);
 
 		m_State = Loaded;
+		return NoError;
+	};	
+	
+	Error AsioApi::SetSampleRate(double srate)
+	{
+		if (m_State == Loaded)
+			return NotOpen;
+
+		CHECK(ASIOSetSampleRate(srate), "Failed to set sample rate", 
+			return _error == ASE_InvalidMode ? InvalidSampleRate : Fail);
+
+		return NoError;
 	};
 
 	Error AsioApi::OpenControlPanel()
@@ -428,8 +440,19 @@ namespace Audijo
 	{
 		switch (selector)
 		{
-		case kAsioSupportsTimeInfo: return true;
-		case kAsioSupportsTimeCode: return true;
+		case kAsioSelectorSupported:
+			if (value == kAsioResetRequest
+				|| value == kAsioEngineVersion
+				|| value == kAsioResyncRequest
+				|| value == kAsioLatenciesChanged
+				|| value == kAsioBufferSizeChange
+				|| value == kAsioSupportsTimeInfo
+				|| value == kAsioSupportsTimeCode
+				|| value == kAsioSupportsInputMonitor)
+				return 1L;
+			return 0L;
+		case kAsioSupportsTimeInfo: return 1L;
+		case kAsioSupportsTimeCode: return 0L;
 		case kAsioBufferSizeChange: 
 		{
 			// When the buffer size changes, free the current buffers
@@ -437,13 +460,22 @@ namespace Audijo
 			m_AsioApi->FreeBuffers();
 			m_AsioApi->m_Parameters.bufferSize = value;
 			m_AsioApi->AllocateBuffers();
-			return true;
+			return 1L;
 		}
 		case kAsioResetRequest:
 		{
-			return true;
+			// Set new buffersize
+			//long a, b, pSize, c;
+			//ASIOGetBufferSize(&a, &b, &pSize, &c);
+			//m_AsioApi->m_Parameters.bufferSize = pSize;
+
+			// Notify that we need to reset
+			m_State = Reset;
+			return 1L;
 		}
 		case kAsioEngineVersion: return 2L;
+		case kAsioResyncRequest: return 1L;
+		case kAsioLatenciesChanged: return 1L;
 		}
 		return 0;
 	};
@@ -486,6 +518,7 @@ namespace Audijo
 			if (_outSwap)
 				m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _deviceOutFormat);
 		}
+		ASIOOutputReady();
 
 		return params;
 	}

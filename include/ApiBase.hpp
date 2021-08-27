@@ -161,6 +161,8 @@ namespace Audijo
 		virtual Error StopStream() = 0;
 		virtual Error CloseStream() = 0;
 
+		virtual Error SetSampleRate(double) = 0;
+
 		void SetCallback(std::unique_ptr<CallbackWrapperBase>&& callback) { m_Callback = std::move(callback); }
 
 		template<typename T>
