@@ -6,8 +6,7 @@ int main()
 {
 	Stream<Wasapi> _stream;
 
-	_stream.Devices();
-
+	// Generate noise
     _stream.Callback([&](Buffer<float>& input, Buffer<float>& output, CallbackInfo info) {   
 		for (auto& _frame : output)
             for (auto& _channel : _frame)
@@ -27,7 +26,6 @@ int main()
 	
 	// Start stream
 	_stream.Start();
-
 	std::cin.get(); // Wait for console input to close stream
 	_stream.Close();
 	
