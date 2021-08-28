@@ -18,6 +18,9 @@ Content
 		- Stream_
 		- StreamAsio_
 		- StreamWasapi_
+	- :ref:`Buffer`
+		- Buffer_
+		- Parallel_
 	- :ref:`Structs`
 		- CallbackInfo_
 		- ChannelInfo_
@@ -32,7 +35,7 @@ Content
 		- Api_
 		- Error_
 - Examples_
-	- :ref:`Simple`
+	- :ref:`Play noise`
 
 Documentation
 ==============
@@ -50,6 +53,17 @@ Stream
 
 .. _StreamWasapi:
 .. doxygenclass:: Audijo::Stream< Wasapi >
+	:members:
+
+Buffer
+------
+
+.. _Buffer:
+.. doxygenclass:: Audijo::Buffer
+	:members:
+	
+.. _Parallel:
+.. doxygenclass:: Audijo::Parallel
 	:members:
 
 Structs
@@ -104,8 +118,8 @@ Enums
 Examples
 ========
 
-Simple
-------
+Play noise
+----------
 
 .. code-block:: cpp
 	
@@ -119,22 +133,26 @@ Simple
         Stream<Wasapi> _stream;
         
         // Set the callback, this can be a (capturing) lambda, but also a function pointer
-        _stream.SetCallback([&](double** input, double** output, CallbackInfo info)
-            {   // generate a simple sinewave
-                static int _counter = 0;
-                for (int i = 0; i < info.bufferSize; i++, _counter++)
-                    for (int j = 0; j < info.outputChannels; j++)
-                        output[j][i] = std::sin(_counter * 0.01) * 0.5;
-            });
+        _stream.Callback([&](Buffer<float>& input, Buffer<float>& output, CallbackInfo info) {   
+            for (auto& _frame : output) // Loop through all frames in the output
+                for (auto& _channel : _frame) // Loop through all the channels in the frame
+                    _channel = 0.5 * ((std::rand() % 10000) / 10000. - 0.5); // Generate noise
+        });
         
         // Open the stream with default settings, and then start the stream
-        _stream.OpenStream({ 
+        _stream.Open({ 
             .input = NoDevice, 
             .output = Default, 
             .bufferSize = Default, 
-            .sampleRate = Default });
-        _stream.StartStream();
+            .sampleRate = Default 
+        });
         
-        // Infinite loop to halt the program.
-        while (true);
+        // Start the stream
+        _stream.Start();
+        
+        // Wait until we get an input from the console.
+        std::cin.get();
+        
+        // Close the stream
+        _stream.Close();
     }

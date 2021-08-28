@@ -2,32 +2,30 @@
 
 using namespace Audijo;
 
-#include <functional>
-
 int main()
 {
-	Stream _stream{ Wasapi };
+	Stream<Wasapi> _stream;
 
+    _stream.Callback([&](Buffer<float>& input, Buffer<float>& output, CallbackInfo info) {   
+        for (auto& _frame : output)
+            for (auto& _channel : _frame)
+                _channel = 0.5 * ((std::rand() % 10000) / 10000. - 0.5);
+    });
 
-	_stream.SetCallback([&](Buffer<float>& input, Buffer<float>& output, CallbackInfo info)
-		{   
-			for (auto& _frame : Parallel{ input, output })
-				for (auto [_in, _out] : _frame)
-					_out = _in;
-		});
-
-	_stream.OpenStream({ 
+	_stream.Open({ 
 		.input = Default,
 		.output = Default,
 		.bufferSize = Default, 
 		.sampleRate = Default 
 	});
 
-	_stream.StartStream();
+	_stream.Information().inFormat;
+	
+	_stream.Start();
 
 	std::cin.get();
 
-	_stream.CloseStream();
+	_stream.Close();
 	
 	
 	//Stream _stream{ Wasapi };

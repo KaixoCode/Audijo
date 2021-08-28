@@ -37,6 +37,12 @@ namespace Audijo
 		const DeviceInfo<>& Device(int id) const { return m_Api->Device(id); }
 
 		/**
+		 * Get stream information. This call only returns useful information after the stream has been opened.
+		 * @return stream information
+		 */
+		const StreamInformation& Information() const { return m_Api->Information(); }
+
+		/**
 		 * Set the callback. A valid callback signare is:
 		 * <code>void(Format**, Format**, CallbackInfo, UserObject)</code>
 		 * where <code>Format</code> is one of <code>int8_t, int16_t, int32_t, float, double</code>
@@ -45,9 +51,9 @@ namespace Audijo
 		 * @param callback
 		 */
 		template<typename ...Args> requires ValidCallback<int, Args...>
-		void SetCallback(Callback<Args...> callback)
+		void Callback(Callback<Args...> callback)
 		{
-			if (m_Api) m_Api->SetCallback(std::make_unique<CallbackWrapper<Callback<Args...>, int(Args...)>>(callback));
+			if (m_Api) m_Api->Callback(std::make_unique<CallbackWrapper<Callback<Args...>, int(Args...)>>(callback));
 		};
 
 		/**
@@ -59,9 +65,9 @@ namespace Audijo
 		 * @param callback
 		 */
 		template<typename Lambda> requires LambdaConstraint<Lambda>
-		void SetCallback(Lambda callback)
+		void Callback(Lambda callback)
 		{
-			if (m_Api) m_Api->SetCallback(std::make_unique<CallbackWrapper<Lambda, typename LambdaSignature<Lambda>::type>>(callback));
+			if (m_Api) m_Api->Callback(std::make_unique<CallbackWrapper<Lambda, typename LambdaSignature<Lambda>::type>>(callback));
 		};
 
 		/**
@@ -80,7 +86,7 @@ namespace Audijo
 		 * InvalidBufferSize - If the buffer size is not supported<br>
 		 * NoError - If stream started successfully
 		 */
-		Error OpenStream(const StreamParameters& settings = StreamParameters{}) { return !m_Api ? NoApi : m_Api->OpenStream(settings); };
+		Error Open(const StreamParameters& settings = StreamParameters{}) { return !m_Api ? NoApi : m_Api->Open(settings); };
 
 		/**
 		 * Starts the flow of audio through the opened stream. Does nothing
@@ -91,7 +97,7 @@ namespace Audijo
 		 * Fail - If device failed to start<br>
 		 * NoError - If stream started successfully
 		 */
-		Error StartStream() { return !m_Api ? NoApi : m_Api->StartStream(); };
+		Error Start() { return !m_Api ? NoApi : m_Api->Start(); };
 
 		/**
 		 * Stop the flow of audio through the stream. Does nothing if the
@@ -102,7 +108,7 @@ namespace Audijo
 		 * Fail - If device failed to stop<br>
 		 * NoError - If stream stopped successfully
 		 */
-		Error StopStream() { return !m_Api ? NoApi : m_Api->StopStream(); };
+		Error Stop() { return !m_Api ? NoApi : m_Api->Stop(); };
 
 		/**
 		 * Close the stream. Also stops the stream if it hasn't been stopped yet.
@@ -112,7 +118,7 @@ namespace Audijo
 		 * Fail - If device failed to close<br>
 		 * NoError - If stream stopped successfully
 		 */
-		Error CloseStream() { return !m_Api ? NoApi : m_Api->CloseStream(); };
+		Error Close() { return !m_Api ? NoApi : m_Api->Close(); };
 
 		/**
 		 * Set the userdata
@@ -134,6 +140,7 @@ namespace Audijo
 
 		/**
 		 * Get this Stream object as a specific api, to expose api specific functions.
+		 * @return this as a stream object for a specific api
 		 */
 		template<Api api>
 		Stream<api>& Get() { return *(Stream<api>*)this; }
@@ -144,6 +151,7 @@ namespace Audijo
 		 */
 		virtual void Api(Api api)
 		{
+			m_Type = api;
 			switch (api)
 			{
 			case Asio: m_Api = std::make_unique<AsioApi>(); break;
@@ -152,8 +160,15 @@ namespace Audijo
 			}
 		}
 
+		/**
+		 * Get the current api of this stream.
+		 * @return api
+		 */
+		virtual Audijo::Api Api() const { return m_Type; }
+
 	protected:
 		std::unique_ptr<ApiBase> m_Api = nullptr;
+		Audijo::Api m_Type = Unspecified;
 	};
 
 	/**
@@ -163,8 +178,9 @@ namespace Audijo
 	template<>
 	class Stream<Wasapi> : public Stream<>
 	{
-		// Delete the api method
+		// Delete methods
 		void Api(Audijo::Api api) override {};
+		using Stream<>::Get;
 
 	public:
 		Stream()
@@ -175,14 +191,16 @@ namespace Audijo
 		 * Search for all available devices. When called more than once, the list will be updated.
 		 * @return all available devices given the chosen api.
 		 */
-		const std::vector<DeviceInfo<Wasapi>>& Devices() { return ((WasapiApi*)m_Api.get())->Devices(); }
+		const std::vector<DeviceInfo<Wasapi>>& Devices() const { return ((WasapiApi*)m_Api.get())->Devices(); }
 
 		/**
 		 * Returns device with the given id.
 		 * @param id device id
 		 * @return device with id
 		 */
-		const DeviceInfo<Wasapi>& Device(int id) { return ((WasapiApi*)m_Api.get())->ApiDevice(id); }
+		const DeviceInfo<Wasapi>& Device(int id) const { return ((WasapiApi*)m_Api.get())->ApiDevice(id); }
+
+		virtual Audijo::Api Api() const override { return Wasapi; };
 	};
 
 	/**
@@ -212,14 +230,16 @@ namespace Audijo
 		 * Search for all available devices. When called more than once, the list will be updated.
 		 * @return all available devices given the chosen api.
 		 */
-		const std::vector<DeviceInfo<Asio>>& Devices() { return ((AsioApi*)m_Api.get())->Devices(); }
+		const std::vector<DeviceInfo<Asio>>& Devices() const { return ((AsioApi*)m_Api.get())->Devices(); }
 
 		/**
 		 * Returns device with the given id.
 		 * @param id device id
 		 * @return device with id
 		 */
-		const DeviceInfo<Asio>& Device(int id) { return ((AsioApi*)m_Api.get())->ApiDevice(id); }
+		const DeviceInfo<Asio>& Device(int id) const { return ((AsioApi*)m_Api.get())->ApiDevice(id); }
+	
+		virtual Audijo::Api Api() const override { return Asio; };
 	};
 
 	Stream(Api)->Stream<Unspecified>;

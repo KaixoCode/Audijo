@@ -144,39 +144,39 @@ namespace Audijo
 		return m_Devices;
 	}
 
-	Error WasapiApi::OpenStream(const StreamParameters& settings)
+	Error WasapiApi::Open(const StreamParameters& settings)
 	{
 		if (m_State != Loaded)
 			return AlreadyOpen;
 
-		m_Parameters = settings;
+		m_Information = settings;
 
 		// Check device ids
-		if (m_Parameters.input == Default)
+		if (m_Information.input == Default)
 			for (auto& i : m_Devices)
 				if (i.defaultDevice && i.inputChannels > 0)
-					m_Parameters.input = i.id;
-		if (m_Parameters.output == Default)
+					m_Information.input = i.id;
+		if (m_Information.output == Default)
 			for (auto& i : m_Devices)
 				if (i.defaultDevice && i.outputChannels > 0)
-					m_Parameters.output = i.id;
+					m_Information.output = i.id;
 		
 		// Set channel count
-		m_Information.inputChannels = m_Parameters.input == NoDevice ? 0 : m_Devices[m_Parameters.input].inputChannels;
-		m_Information.outputChannels = m_Parameters.output == NoDevice ? 0 : m_Devices[m_Parameters.output].outputChannels;
+		m_Information.inputChannels = m_Information.input == NoDevice ? 0 : m_Devices[m_Information.input].inputChannels;
+		m_Information.outputChannels = m_Information.output == NoDevice ? 0 : m_Devices[m_Information.output].outputChannels;
 
 		// Default buffersize is 256 because why not lol
-		if (m_Parameters.bufferSize == Default)
-			m_Parameters.bufferSize = 256;
+		if (m_Information.bufferSize == Default)
+			m_Information.bufferSize = 256;
 
 		// Retrieve necessary settings;
-		int _inDeviceId = m_Parameters.input;
-		int _outDeviceId = m_Parameters.output;
+		int _inDeviceId = m_Information.input;
+		int _outDeviceId = m_Information.output;
 		int _nInChannels = m_Information.inputChannels;
 		int _nOutChannels = m_Information.outputChannels;
 		int _nChannels = _nInChannels + _nOutChannels;
-		int _bufferSize = m_Parameters.bufferSize;
-		int _sampleRate = m_Parameters.sampleRate;
+		int _bufferSize = m_Information.bufferSize;
+		int _sampleRate = m_Information.sampleRate;
 
 		if (_inDeviceId != NoDevice)
 		{
@@ -192,10 +192,10 @@ namespace Audijo
 			
 			// If no samplerate, set to supported samplerate
 			if (_sampleRate == Default)
-				m_Parameters.sampleRate = _sampleRate = _inFormat->nSamplesPerSec;
+				m_Information.sampleRate = _sampleRate = _inFormat->nSamplesPerSec;
 
 			// Otherwise check samplerate
-			else if (_inFormat->nSamplesPerSec != _sampleRate && !m_Parameters.resampling)
+			else if (_inFormat->nSamplesPerSec != _sampleRate && !m_Information.resampling)
 			{
 				LOGL("Invalid sample rate selected");
 				return InvalidSampleRate;
@@ -235,10 +235,10 @@ namespace Audijo
 	
 			// If no samplerate, set to supported samplerate
 			if (_sampleRate == Default)
-				m_Parameters.sampleRate = _sampleRate = _outFormat->nSamplesPerSec;
+				m_Information.sampleRate = _sampleRate = _outFormat->nSamplesPerSec;
 
 			// If invalid samplerate and was valid for input device, it's invalid duplex because no support for resampling.
-			if (_outFormat->nSamplesPerSec != _sampleRate && !m_Parameters.resampling)
+			if (_outFormat->nSamplesPerSec != _sampleRate && !m_Information.resampling)
 			{
 				LOGL("Invalid sample rate selected");
 				return _inDeviceId != NoDevice ? InvalidDuplex : InvalidSampleRate;
@@ -286,7 +286,7 @@ namespace Audijo
 		return NoError;
 	}
 
-	Error WasapiApi::StartStream()
+	Error WasapiApi::Start()
 	{
 		if (m_State == Loaded)
 			return NotOpen;
@@ -311,8 +311,8 @@ namespace Audijo
 
 				int _nInChannels = m_Information.inputChannels;
 				int _nOutChannels = m_Information.outputChannels;
-				int _bufferSize = m_Parameters.bufferSize;
-				auto _sampleRate = m_Parameters.sampleRate;
+				int _bufferSize = m_Information.bufferSize;
+				auto _sampleRate = m_Information.sampleRate;
 				auto _deviceInFormat = m_Information.deviceInFormat;
 				auto _deviceOutFormat = m_Information.deviceOutFormat;
 				auto _inFormat = m_Information.inFormat;
@@ -363,17 +363,17 @@ namespace Audijo
 				}
 
 				// Create ring buffers
-				RingBuffer<char> _inRingBuffer{ (_bufferSize + _inputFramesAvailable) * _nInChannels * FormatBytes(_deviceInFormat) };
-				RingBuffer<char> _outRingBuffer{ (_bufferSize + _outputFramesAvailable) * _nOutChannels * FormatBytes(_deviceOutFormat) };
+				RingBuffer<char> _inRingBuffer{ (_bufferSize + _inputFramesAvailable) * _nInChannels * (_deviceInFormat & Bytes) };
+				RingBuffer<char> _outRingBuffer{ (_bufferSize + _outputFramesAvailable) * _nOutChannels * (_deviceOutFormat & Bytes) };
 
 				// Create temporary buffers
 				char** _tempInBuff = new char* [_nInChannels];
 				for (int i = 0; i < _nInChannels; i++)
-					_tempInBuff[i] = new char[_bufferSize * FormatBytes(_deviceInFormat)];
+					_tempInBuff[i] = new char[_bufferSize * (_deviceInFormat & Bytes)];
 
 				char** _tempOutBuff = new char* [_nOutChannels];
 				for (int i = 0; i < _nOutChannels; i++)
-					_tempOutBuff[i] = new char[_bufferSize * FormatBytes(_deviceOutFormat)];
+					_tempOutBuff[i] = new char[_bufferSize * (_deviceOutFormat & Bytes)];
 
 				// Start loop
 				while (m_State == Running)
@@ -385,13 +385,13 @@ namespace Audijo
 						if (m_InputClient)
 						{
 							// Only pull if the ring buffer contains enough samples to fill the user buffer
-							if (_inRingBuffer.Size() >= _bufferSize * _nInChannels * FormatBytes(_deviceInFormat))
+							if (_inRingBuffer.Size() >= _bufferSize * _nInChannels * (_deviceInFormat & Bytes))
 							{
 								// Get samples from ring buffer
 								for (int i = 0; i < _bufferSize; i++)
 									for (int j = 0; j < _nInChannels; j++)
-										for (int k = 0; k < FormatBytes(_deviceInFormat); k++)
-											_tempInBuff[j][i * FormatBytes(_deviceInFormat) + k] = _inRingBuffer.Dequeue();
+										for (int k = 0; k < (_deviceInFormat & Bytes); k++)
+											_tempInBuff[j][i * (_deviceInFormat & Bytes) + k] = _inRingBuffer.Dequeue();
 
 								// Convert to the right format
 								for (int j = 0; j < _nInChannels; j++)
@@ -414,7 +414,7 @@ namespace Audijo
 					// If we've pull, it means the callback was called, so we need to handle the user output buffer
 					if (m_OutputClient && _pulled)
 					{
-						if (_outRingBuffer.Space() >= _bufferSize * _nOutChannels * FormatBytes(_deviceOutFormat))
+						if (_outRingBuffer.Space() >= _bufferSize * _nOutChannels * (_deviceOutFormat & Bytes))
 						{
 							// First convert to the right format
 							for (int j = 0; j < _nOutChannels; j++)
@@ -423,8 +423,8 @@ namespace Audijo
 							// Then add it to the output ring buffer
 							for (int i = 0; i < _bufferSize; i++)
 								for (int j = 0; j < _nOutChannels; j++)
-									for (int k = 0; k < FormatBytes(_deviceOutFormat); k++)
-										_outRingBuffer.Enqueue(_tempOutBuff[j][i * FormatBytes(_deviceOutFormat) + k]);
+									for (int k = 0; k < (_deviceOutFormat & Bytes); k++)
+										_outRingBuffer.Enqueue(_tempOutBuff[j][i * (_deviceOutFormat & Bytes) + k]);
 
 							_pushed = true;
 						}
@@ -456,10 +456,10 @@ namespace Audijo
 						CHECK(m_CaptureClient->GetBuffer(&_streamBuffer, &_inputFramesAvailable, &_flags, nullptr, nullptr), "Failed to retrieve input buffer.", goto Cleanup);
 
 						// If there is enough space in the input ring buffer, we'll enqueue it.
-						if (_inRingBuffer.Space() >= _inputFramesAvailable * _nInChannels * FormatBytes(_deviceInFormat))
+						if (_inRingBuffer.Space() >= _inputFramesAvailable * _nInChannels * (_deviceInFormat & Bytes))
 						{
 							// Add the input data to the input ring buffer
-							for (int i = 0; i < _inputFramesAvailable * _nInChannels * FormatBytes(_deviceInFormat); i++)
+							for (int i = 0; i < _inputFramesAvailable * _nInChannels * (_deviceInFormat & Bytes); i++)
 								_inRingBuffer.Enqueue(_streamBuffer[i]);
 
 							CHECK(m_CaptureClient->ReleaseBuffer(_inputFramesAvailable), "Unable to release capture buffer", goto Cleanup);
@@ -479,13 +479,13 @@ namespace Audijo
 						_outputFramesAvailable -= _framePadding;
 
 						// If we have enough data to write to the device from the output ring buffer
-						if (_outputFramesAvailable != 0 && _outRingBuffer.Size() >= _outputFramesAvailable * _nOutChannels * FormatBytes(_deviceOutFormat))
+						if (_outputFramesAvailable != 0 && _outRingBuffer.Size() >= _outputFramesAvailable * _nOutChannels * (_deviceOutFormat & Bytes))
 						{
 							// Get the buffer
 							CHECK(m_RenderClient->GetBuffer(_outputFramesAvailable, &_streamBuffer), "Failed to retrieve output buffer.", goto Cleanup);
 
 							// Put data in the output device buffer
-							for (int i = 0; i < _outputFramesAvailable * _nOutChannels * FormatBytes(_deviceOutFormat); i++)
+							for (int i = 0; i < _outputFramesAvailable * _nOutChannels * (_deviceOutFormat & Bytes); i++)
 								_streamBuffer[i] = _outRingBuffer.Dequeue();
 							
 							CHECK(m_RenderClient->ReleaseBuffer(_outputFramesAvailable, 0), "Unable to release capture buffer", goto Cleanup);
@@ -518,7 +518,7 @@ namespace Audijo
 		return NoError;
 	};
 
-	Error WasapiApi::StopStream()
+	Error WasapiApi::Stop()
 	{
 		if (m_State == Loaded)
 			return NotOpen;
@@ -538,13 +538,13 @@ namespace Audijo
 		return NoError;
 	};
 
-	Error WasapiApi::CloseStream()
+	Error WasapiApi::Close()
 	{
 		if (m_State == Loaded)
 			return NotOpen;
 
 		if (m_State == Running)
-			StopStream();
+			Stop();
 		
 		m_InputDevice.Release();  
 		m_OutputDevice.Release(); 
@@ -555,7 +555,7 @@ namespace Audijo
 		m_State = Loaded;
 	};
 
-	Error WasapiApi::SetSampleRate(double srate)
+	Error WasapiApi::SampleRate(double srate)
 	{
 		if (m_State == Loaded)
 			return NotOpen;

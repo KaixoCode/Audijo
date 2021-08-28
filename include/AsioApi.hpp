@@ -37,17 +37,18 @@ namespace Audijo
 		enum State { Loaded, Initialized, Prepared, Running, Reset };
 	public:
 		AsioApi();
+		~AsioApi();
 		
 		const std::vector<DeviceInfo<Asio>>& Devices();
-		const DeviceInfo<>& Device(int id) override { for (auto& i : m_Devices) if (i.id == id) return i; };
-		const DeviceInfo<Asio>& ApiDevice(int id) { for (auto& i : m_Devices) if (i.id == id) return i; };
+		const DeviceInfo<>& Device(int id) const override { for (auto& i : m_Devices) if (i.id == id) return i; };
+		const DeviceInfo<Asio>& ApiDevice(int id) const { for (auto& i : m_Devices) if (i.id == id) return i; };
 
-		Error OpenStream(const StreamParameters& settings = StreamParameters{}) override;
-		Error StartStream() override;
-		Error StopStream() override;
-		Error CloseStream() override;
+		Error Open(const StreamParameters& settings = StreamParameters{}) override;
+		Error Start() override;
+		Error Stop() override;
+		Error Close() override;
 
-		Error SetSampleRate(double) override;
+		Error SampleRate(double) override;
 
 		Error OpenControlPanel();
 

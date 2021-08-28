@@ -62,15 +62,15 @@ namespace Audijo
 		WasapiApi();
 
 		const std::vector<DeviceInfo<Wasapi>>& Devices();
-		const DeviceInfo<>& Device(int id) override { for (auto& i : m_Devices) if (i.id == id) return (DeviceInfo<>&)i; };
-		const DeviceInfo<Wasapi>& ApiDevice(int id) { for (auto& i : m_Devices) if (i.id == id) return i; };
+		const DeviceInfo<>& Device(int id) const override { for (auto& i : m_Devices) if (i.id == id) return (DeviceInfo<>&)i; };
+		const DeviceInfo<Wasapi>& ApiDevice(int id) const { for (auto& i : m_Devices) if (i.id == id) return i; };
 
-		Error OpenStream(const StreamParameters& settings = StreamParameters{}) override;
-		Error StartStream() override;
-		Error StopStream() override;
-		Error CloseStream() override;
+		Error Open(const StreamParameters& settings = StreamParameters{}) override;
+		Error Start() override;
+		Error Stop() override;
+		Error Close() override;
 
-		Error SetSampleRate(double) override;
+		Error SampleRate(double) override;
 
 	protected:
 		std::vector<DeviceInfo<Wasapi>> m_Devices;

@@ -30,7 +30,7 @@ namespace Audijo
 	{
 		int _nInChannels = m_Information.inputChannels;
 		int _nOutChannels = m_Information.outputChannels;
-		int _bufferSize = m_Parameters.bufferSize;
+		int _bufferSize = m_Information.bufferSize;
 		auto _inFormat = m_Information.inFormat;
 		auto _outFormat = m_Information.outFormat;
 
@@ -38,10 +38,10 @@ namespace Audijo
 		m_OutputBuffers = new char* [_nOutChannels];
 
 		for (int i = 0; i < _nInChannels; i++)
-			m_InputBuffers[i] = new char[_bufferSize * FormatBytes(_inFormat)];
+			m_InputBuffers[i] = new char[_bufferSize * (_inFormat & Bytes)];
 
 		for (int i = 0; i < _nOutChannels; i++)
-			m_OutputBuffers[i] = new char[_bufferSize * FormatBytes(_outFormat)];
+			m_OutputBuffers[i] = new char[_bufferSize * (_inFormat & Bytes)];
 	}
 
 	void ApiBase::FreeBuffers()
@@ -184,10 +184,5 @@ namespace Audijo
 				ptr += 5;
 			}
 		}
-	}
-
-	unsigned int ApiBase::FormatBytes(SampleFormat format)
-	{
-		return format & 0xF;
 	}
 }
