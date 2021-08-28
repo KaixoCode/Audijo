@@ -5,7 +5,7 @@ Help me test this badboi, I can't really test all edge cases since I myself only
 
 Documentation: https://code.kaixo.me/Audijo/
 
-Here's a quick example, it opens the default Wasapi device and just generates a sine wave.
+Here's a quick example, it opens the default Wasapi device and just generates noise.
 ```cpp
 Stream<Wasapi> _stream;
 
