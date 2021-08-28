@@ -8,15 +8,16 @@ int main()
 {
 	Stream _stream{ Wasapi };
 
+
 	_stream.SetCallback([&](Buffer<float>& input, Buffer<float>& output, CallbackInfo info)
 		{   
-			for (auto& _channel : output)
-				for (auto& _sample : _channel)
-					_sample = 0.5 * ((std::rand() % 10000) / 10000. - 0.5);
+			for (auto& _frame : Parallel{ input, output })
+				for (auto [_in, _out] : _frame)
+					_out = _in;
 		});
 
 	_stream.OpenStream({ 
-		.input = NoDevice, 
+		.input = Default,
 		.output = Default,
 		.bufferSize = Default, 
 		.sampleRate = Default 
