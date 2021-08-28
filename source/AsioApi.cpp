@@ -273,16 +273,16 @@ namespace Audijo
 			m_Information.deviceInFormat = Float32;
 			switch (_inChannelInfo.type)
 			{
-			case ASIOSTInt16MSB: m_Information.deviceInFormat = m_SInt16; break;
+			case ASIOSTInt16MSB: m_Information.deviceInFormat = SInt16; break;
 			case ASIOSTInt16LSB: m_Information.deviceInFormat = Int16; break;
 			case ASIOSTInt24MSB:
 			case ASIOSTInt24LSB:
 				return UnsupportedSampleFormat;
-			case ASIOSTInt32MSB: m_Information.deviceInFormat = m_SInt32; break;
+			case ASIOSTInt32MSB: m_Information.deviceInFormat = SInt32; break;
 			case ASIOSTInt32LSB: m_Information.deviceInFormat = Int32; break;
-			case ASIOSTFloat32MSB: m_Information.deviceInFormat = m_SFloat32; break;
+			case ASIOSTFloat32MSB: m_Information.deviceInFormat = SFloat32; break;
 			case ASIOSTFloat32LSB: m_Information.deviceInFormat = Float32; break;
-			case ASIOSTFloat64MSB: m_Information.deviceInFormat = m_SFloat64; break;
+			case ASIOSTFloat64MSB: m_Information.deviceInFormat = SFloat64; break;
 			case ASIOSTFloat64LSB: m_Information.deviceInFormat = Float64; break;
 			}
 
@@ -296,16 +296,16 @@ namespace Audijo
 			m_Information.deviceOutFormat = Float32;
 			switch (_outChannelInfo.type)
 			{
-			case ASIOSTInt16MSB: m_Information.deviceOutFormat = m_SInt16; break;
+			case ASIOSTInt16MSB: m_Information.deviceOutFormat = SInt16; break;
 			case ASIOSTInt16LSB: m_Information.deviceOutFormat = Int16; break;
 			case ASIOSTInt24MSB:
 			case ASIOSTInt24LSB:
 				return UnsupportedSampleFormat;
-			case ASIOSTInt32MSB: m_Information.deviceOutFormat = m_SInt32; break;
+			case ASIOSTInt32MSB: m_Information.deviceOutFormat = SInt32; break;
 			case ASIOSTInt32LSB: m_Information.deviceOutFormat = Int32; break;
-			case ASIOSTFloat32MSB: m_Information.deviceOutFormat = m_SFloat32; break;
+			case ASIOSTFloat32MSB: m_Information.deviceOutFormat = SFloat32; break;
 			case ASIOSTFloat32LSB: m_Information.deviceOutFormat = Float32; break;
-			case ASIOSTFloat64MSB: m_Information.deviceOutFormat = m_SFloat64; break;
+			case ASIOSTFloat64MSB: m_Information.deviceOutFormat = SFloat64; break;
 			case ASIOSTFloat64LSB: m_Information.deviceOutFormat = Float64; break;
 			}
 
