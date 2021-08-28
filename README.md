@@ -1,7 +1,7 @@
 # Audijo
 
 **It is in beta!**
-Help me test this badboi, I can't really test all edge cases since I myself only have 2 ASIO devices. So if you find any bugs or crashes lemme know. If you want to use ASIO you're going to have to download the asio sdk and put the folder in <code>./sdk</code> in the root folder.
+Help me test this badboi, I can't really test all edge cases since I myself only have 2 ASIO devices. So if you find any bugs or crashes lemme know. If you want to use ASIO you're going to have to download the asio sdk and put the asio folder in the folder <code>./sdk</code>.
 
 Documentation: https://code.kaixo.me/Audijo/
 
