@@ -12,7 +12,7 @@ namespace Audijo
 			if constexpr (std::is_integral_v<In> && std::is_integral_v<Out>)
 			{
 				out[i] = (Out)in[i];
-				if (sizeof(Out) - sizeof(In) > 0)
+				if (sizeof(Out) - sizeof(In) > 0 && sizeof(Out) - sizeof(In) < sizeof(Out) * 8)
 					out[i] <<= sizeof(Out) - sizeof(In);
 			}
 			else if constexpr (std::is_floating_point_v<In> && std::is_floating_point_v<Out>)

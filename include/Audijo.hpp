@@ -40,7 +40,7 @@ namespace Audijo
 		 * Get the device count.
 		 * @return device count
 		 */
-		int DeviceCount() const { return m_Api->DeviceCount(); }
+		int DeviceCount() const { return !m_Api ? 0 : m_Api->DeviceCount(); }
 
 		/**
 		 * Get stream information. This call only returns useful information after the stream has been opened.
@@ -99,6 +99,7 @@ namespace Audijo
 		 * if the stream has not been opened yet.<br>
 		 * @return 
 		 * NotOpen - If the stream wasn't opened<br>
+		 * NoApi - If no Api was specified<br>
 		 * AlreadyRunning - If the stream is already running<br>
 		 * Fail - If device failed to start<br>
 		 * NoError - If stream started successfully
@@ -110,6 +111,7 @@ namespace Audijo
 		 * stream hasn't been started or opened yet.
 		 * @return 
 		 * NotOpen - If the stream wasn't opened<br>
+		 * NoApi - If no Api was specified<br>
 		 * NotRunning - If the stream is not running<br>
 		 * Fail - If device failed to stop<br>
 		 * NoError - If stream stopped successfully
@@ -121,6 +123,7 @@ namespace Audijo
 		 * Does nothing if the stream hasn't been opened yet.
 		 * @return 
 		 * NotOpen - If the stream wasn't opened<br>
+		 * NoApi - If no Api was specified<br>
 		 * Fail - If device failed to close<br>
 		 * NoError - If stream stopped successfully
 		 */
@@ -138,6 +141,7 @@ namespace Audijo
 		 * @param srate sample rate
 		 * @return
 		 * NotOpen - If no device is open.
+		 * NoApi - If no Api was specified<br>
 		 * InvalidSampleRate - If the sample rate is not supported
 		 * Fail - If changing the sample rate at this time is not supported, or general fail.
 		 * NoError - If sample rate successfully changed
