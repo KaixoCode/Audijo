@@ -41,6 +41,7 @@ namespace Audijo
 		
 		const std::vector<DeviceInfo<Asio>>& Devices();
 		const DeviceInfo<>& Device(int id) const override { for (auto& i : m_Devices) if (i.id == id) return i; };
+		int DeviceCount() const override { return m_Devices.size(); };
 		const DeviceInfo<Asio>& ApiDevice(int id) const { for (auto& i : m_Devices) if (i.id == id) return i; };
 
 		Error Open(const StreamParameters& settings = StreamParameters{}) override;

@@ -63,6 +63,7 @@ namespace Audijo
 
 		const std::vector<DeviceInfo<Wasapi>>& Devices();
 		const DeviceInfo<>& Device(int id) const override { for (auto& i : m_Devices) if (i.id == id) return (DeviceInfo<>&)i; };
+		int DeviceCount() const override { return m_Devices.size(); };
 		const DeviceInfo<Wasapi>& ApiDevice(int id) const { for (auto& i : m_Devices) if (i.id == id) return i; };
 
 		Error Open(const StreamParameters& settings = StreamParameters{}) override;

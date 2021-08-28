@@ -37,6 +37,12 @@ namespace Audijo
 		const DeviceInfo<>& Device(int id) const { return m_Api->Device(id); }
 
 		/**
+		 * Get the device count.
+		 * @return device count
+		 */
+		int DeviceCount() const { return m_Api->DeviceCount(); }
+
+		/**
 		 * Get stream information. This call only returns useful information after the stream has been opened.
 		 * @return stream information
 		 */

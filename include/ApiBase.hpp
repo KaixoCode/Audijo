@@ -180,6 +180,7 @@ namespace Audijo
 	public:
 		virtual ~ApiBase() { FreeBuffers(); }
 		virtual const DeviceInfo<>& Device(int id) const = 0;
+		virtual int DeviceCount() const = 0;
 		virtual const StreamInformation& Information() const { return m_Information;  };
 
 		virtual Error Open(const StreamParameters& settings = StreamParameters{}) = 0;

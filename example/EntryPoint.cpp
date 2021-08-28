@@ -6,25 +6,29 @@ int main()
 {
 	Stream<Wasapi> _stream;
 
+	_stream.Devices();
+
     _stream.Callback([&](Buffer<float>& input, Buffer<float>& output, CallbackInfo info) {   
-        for (auto& _frame : output)
+		for (auto& _frame : output)
             for (auto& _channel : _frame)
                 _channel = 0.5 * ((std::rand() % 10000) / 10000. - 0.5);
     });
 
-	_stream.Open({ 
-		.input = Default,
+	_stream.Open({ // Open stream
+		.input = NoDevice,
 		.output = Default,
 		.bufferSize = Default, 
 		.sampleRate = Default 
 	});
 
-	_stream.Information().inFormat;
+	// Get information
+	_stream.Information().sampleRate;
+	_stream.Information().bufferSize; // etc.
 	
+	// Start stream
 	_stream.Start();
 
-	std::cin.get();
-
+	std::cin.get(); // Wait for console input to close stream
 	_stream.Close();
 	
 	
