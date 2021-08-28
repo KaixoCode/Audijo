@@ -1,5 +1,5 @@
 #pragma once
-#include "pch.hpp"
+#include "Audijo/pch.hpp"
 
 namespace Audijo
 {
@@ -59,7 +59,7 @@ namespace Audijo
 			 * @param data buffer object this frame belongs to
 			 * @param index index of this frame in the buffer
 			 */
-			Frame(Buffer& data, int index)
+			Frame(Buffer<Type>& data, int index)
 				: m_Buffer(data), m_Index(index)
 			{}
 
@@ -160,7 +160,7 @@ namespace Audijo
 		 * @param index index
 		 * @return frame at index
 		 */
-		Frame operator[](int index) const { return Frame{ *this, index }; }
+		Frame operator[](int index) { return Frame{ *this, index }; }
 
 		Iterator begin() { return Iterator{ Frame{ *this, 0 } }; }
 		Iterator end() { return Iterator{ Frame{ *this, Frames() } }; }

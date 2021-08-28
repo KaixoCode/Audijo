@@ -1,6 +1,6 @@
 #ifdef AUDIJO_WASAPI
-#include "WasapiApi.hpp"
-#include "RingBuffer.hpp"
+#include "Audijo/WasapiApi.hpp"
+#include "Audijo/RingBuffer.hpp"
 
 namespace Audijo
 {

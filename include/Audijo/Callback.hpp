@@ -1,6 +1,6 @@
 #pragma once
-#include "pch.hpp"
-#include "Buffer.hpp"
+#include "Audijo/pch.hpp"
+#include "Audijo/Buffer.hpp"
 
 namespace Audijo
 {
@@ -91,7 +91,7 @@ namespace Audijo
 	concept LambdaConstraint = SignatureCheck<typename LambdaSignature<Signature>::type>;
 
 	// Callback type
-	template<typename ...Args> requires ValidCallback<int, Args...>
+	template<typename ...Args> requires ValidCallback<void, Args...>
 	using Callback = void(*)(Args...);
 
 	/**

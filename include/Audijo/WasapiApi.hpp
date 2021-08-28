@@ -1,6 +1,6 @@
 #pragma once
-#include "pch.hpp"
-#include "ApiBase.hpp"
+#include "Audijo/pch.hpp"
+#include "Audijo/ApiBase.hpp"
 
 namespace Audijo
 {
@@ -60,6 +60,7 @@ namespace Audijo
 		enum State { Loaded, Initialized, Prepared, Running };
 	public:
 		WasapiApi();
+		~WasapiApi() { Close(); }
 
 		const std::vector<DeviceInfo<Wasapi>>& Devices();
 		const DeviceInfo<>& Device(int id) const override { for (auto& i : m_Devices) if (i.id == id) return (DeviceInfo<>&)i; };

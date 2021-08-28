@@ -1,8 +1,8 @@
 #pragma once
-#include "pch.hpp"
-#include "ApiBase.hpp"
-#include "AsioApi.hpp"
-#include "WasapiApi.hpp"
+#include "Audijo/pch.hpp"
+#include "Audijo/ApiBase.hpp"
+#include "Audijo/AsioApi.hpp"
+#include "Audijo/WasapiApi.hpp"
 
 namespace Audijo
 {
@@ -56,10 +56,10 @@ namespace Audijo
 		 * and can be left out.
 		 * @param callback
 		 */
-		template<typename ...Args> requires ValidCallback<int, Args...>
-		void Callback(Callback<Args...> callback)
+		template<typename ...Args> requires ValidCallback<void, Args...>
+		void Callback(void(*callback)(Args...))
 		{
-			if (m_Api) m_Api->Callback(std::make_unique<CallbackWrapper<Callback<Args...>, int(Args...)>>(callback));
+			if (m_Api) m_Api->Callback(std::make_unique<CallbackWrapper<void(*)(Args...), void(Args...)>>(callback));
 		};
 
 		/**

@@ -1,6 +1,6 @@
 #pragma once
-#include "pch.hpp"
-#include "ApiBase.hpp"
+#include "Audijo/pch.hpp"
+#include "Audijo/ApiBase.hpp"
 #include "asiosys.h"
 #include "asio.h"
 #include "iasiodrv.h"

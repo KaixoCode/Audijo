@@ -1,6 +1,6 @@
 #pragma once
-#include "pch.hpp"
-#include "Callback.hpp"
+#include "Audijo/pch.hpp"
+#include "Audijo/Callback.hpp"
 
 namespace Audijo 
 {
@@ -128,10 +128,10 @@ namespace Audijo
 	 */
 	struct StreamInformation
 	{
-		int input = 0;
-		int output = 0;
-		int bufferSize = 0;
-		double sampleRate = 0;
+		int input = -1;
+		int output = -1;
+		int bufferSize = -1;
+		double sampleRate = -1;
 		bool resampling = false;
 		int inputChannels = 0;
 		int outputChannels = 0;
