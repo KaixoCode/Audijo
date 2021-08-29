@@ -1,4 +1,4 @@
-#include "Audijo.hpp"
+#include "Audijo/Audijo.hpp"
 
 using namespace Audijo;
 
