@@ -140,7 +140,7 @@ namespace Audijo
 	 */
 	struct StreamInformation
 	{
-		StreamState state = Closed;          // State of the stream
+		StreamState state = Closed;          // State of the stream	
 		int input = NoDevice;                // Input device
 		int output = NoDevice;               // output device
 		int bufferSize = 0;                  // Buffer size
