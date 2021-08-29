@@ -7,7 +7,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${AUDIJO_SRC}/cmake/")
 # Main library linking and including
 project (${PRJ_NAME})
 
-file(GLOB_RECURSE SOURCE
+file(GLOB_RECURSE AUDIJO_SOURCE
   "${AUDIJO_SRC}source/*.cpp"
   "${AUDIJO_SRC}include/*.hpp"
 )
@@ -46,7 +46,7 @@ list(APPEND SOURCE
 endif()
 
 # Add the library
-add_library(${PRJ_NAME} STATIC ${SOURCE})
+add_library(${PRJ_NAME} STATIC ${AUDIJO_SOURCE})
 
 target_include_directories(${PRJ_NAME} PUBLIC
   ${INCLUDE_DIRS}
@@ -59,7 +59,7 @@ target_link_libraries(${PRJ_NAME}
 )
 
 # Group source according to folder layout
-source_group(TREE ${AUDIJO_SRC} FILES ${SOURCE})
+source_group(TREE ${AUDIJO_SRC} FILES ${AUDIJO_SOURCE})
 
 # PCH
 target_precompile_headers(${PRJ_NAME} PUBLIC "${AUDIJO_SRC}include/Audijo/pch.hpp")
