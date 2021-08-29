@@ -1,19 +1,19 @@
 cmake_minimum_required (VERSION 3.0)
 set(PRJ_NAME "Audijo")
 set(CMAKE_CXX_STANDARD 20)
-set(SRC "${${PRJ_NAME}_SOURCE_DIR}/")
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${SRC}/cmake/")
+set(AUDIJO_SRC "${${PRJ_NAME}_SOURCE_DIR}/")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${AUDIJO_SRC}/cmake/")
 
 # Main library linking and including
 project (${PRJ_NAME})
 
 file(GLOB_RECURSE SOURCE
-  "${SRC}source/*.cpp"
-  "${SRC}include/*.hpp"
+  "${AUDIJO_SRC}source/*.cpp"
+  "${AUDIJO_SRC}include/*.hpp"
 )
 
 set(INCLUDE_DIRS
-  ${SRC}include/
+  ${AUDIJO_SRC}include/
 )
 
 option(AUDIJO_BUILD_DOCS "Build Docs" OFF)
@@ -59,10 +59,10 @@ target_link_libraries(${PRJ_NAME}
 )
 
 # Group source according to folder layout
-source_group(TREE ${SRC} FILES ${SOURCE})
+source_group(TREE ${AUDIJO_SRC} FILES ${SOURCE})
 
 # PCH
-target_precompile_headers(${PRJ_NAME} PUBLIC "${SRC}include/Audijo/pch.hpp")
+target_precompile_headers(${PRJ_NAME} PUBLIC "${AUDIJO_SRC}include/Audijo/pch.hpp")
 
 # Example project
 if(AUDIJO_BUILD_EXAMPLE)
@@ -71,7 +71,7 @@ project (${EXM_NAME})
 set(EXM_SRC "${${EXM_NAME}_SOURCE_DIR}/")
 file(GLOB_RECURSE EXAMPLE_SOURCE "${EXM_SRC}example/*.cpp")
 add_executable(${EXM_NAME} ${EXAMPLE_SOURCE})
-target_include_directories(${EXM_NAME} PUBLIC "${SRC}include/")
+target_include_directories(${EXM_NAME} PUBLIC "${AUDIJO_SRC}include/")
 target_link_libraries(${EXM_NAME} ${PRJ_NAME})
 source_group(TREE ${EXM_SRC} FILES ${EXAMPLE_SOURCE})
 endif()

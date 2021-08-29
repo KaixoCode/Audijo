@@ -1,3 +1,4 @@
+#ifdef AUDIJO_WASAPI
 #pragma once
 #include "Audijo/pch.hpp"
 #include "Audijo/ApiBase.hpp"
@@ -89,3 +90,4 @@ namespace Audijo
 		std::thread m_AudioThread;
 	};
 }
+#endif

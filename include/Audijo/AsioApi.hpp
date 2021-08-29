@@ -1,3 +1,4 @@
+#ifdef AUDIJO_ASIO
 #pragma once
 #include "Audijo/pch.hpp"
 #include "Audijo/ApiBase.hpp"
@@ -5,7 +6,6 @@
 #include "asio.h"
 #include "iasiodrv.h"
 #include "asiodrivers.h"
-
 namespace Audijo
 {
 	template<>
@@ -68,3 +68,4 @@ namespace Audijo
 		friend class DeviceInfo<Asio>;
 	};
 }
+#endif

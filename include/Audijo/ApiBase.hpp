@@ -6,7 +6,14 @@ namespace Audijo
 {
 	enum Api
 	{
-		Unspecified, Asio, Wasapi
+		Unspecified, 
+
+#ifdef AUDIJO_ASIO
+		Asio,
+#endif
+#ifdef AUDIJO_WASAPI
+		Wasapi
+#endif
 	};
 
 	enum SampleFormat 

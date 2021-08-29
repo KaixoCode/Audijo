@@ -164,8 +164,12 @@ namespace Audijo
 			m_Type = api;
 			switch (api)
 			{
+#ifdef AUDIJO_ASIO
 			case Asio: m_Api = std::make_unique<AsioApi>(); break;
+#endif
+#ifdef AUDIJO_WASAPI
 			case Wasapi: m_Api = std::make_unique<WasapiApi>(); break;
+#endif
 			default: throw std::exception("Incompatible api");
 			}
 		}
@@ -181,6 +185,7 @@ namespace Audijo
 		Audijo::Api m_Type = Unspecified;
 	};
 
+#ifdef AUDIJO_WASAPI
 	/**
 	 * Wasapi specific Stream object, for when api is decided at compiletime, 
 	 * exposes api specific functions directly.
@@ -212,7 +217,9 @@ namespace Audijo
 
 		virtual Audijo::Api Api() const override { return Wasapi; };
 	};
+#endif
 
+#ifdef AUDIJO_ASIO
 	/**
 	 * Asio specific Stream object, for when api is decided at compiletime,
 	 * exposes api specific functions directly.
@@ -251,6 +258,7 @@ namespace Audijo
 	
 		virtual Audijo::Api Api() const override { return Asio; };
 	};
+#endif
 
 	Stream(Api)->Stream<Unspecified>;
 	Stream()->Stream<Unspecified>;
