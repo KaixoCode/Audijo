@@ -57,7 +57,6 @@ namespace Audijo
 			T* ptr;
 		};
 
-		enum State { Loaded, Initialized, Prepared, Running };
 	public:
 		WasapiApi();
 		~WasapiApi() { Close(); }
@@ -88,7 +87,5 @@ namespace Audijo
 		Pointer<IAudioRenderClient> m_RenderClient;   // Output client
 
 		std::thread m_AudioThread;
-
-		State m_State = Loaded;
 	};
 }

@@ -123,22 +123,28 @@ namespace Audijo
 		bool resampling = true;
 	};
 
+	enum StreamState
+	{
+		Closed, Opened, Running
+	};
+
 	/**
 	 * Stream information.
 	 */
 	struct StreamInformation
 	{
-		int input = -1;
-		int output = -1;
-		int bufferSize = -1;
-		double sampleRate = -1;
-		bool resampling = false;
-		int inputChannels = 0;
-		int outputChannels = 0;
-		SampleFormat inFormat = None;
-		SampleFormat outFormat = None;
-		SampleFormat deviceInFormat = None;
-		SampleFormat deviceOutFormat = None;
+		StreamState state = Closed;          // State of the stream
+		int input = NoDevice;                // Input device
+		int output = NoDevice;               // output device
+		int bufferSize = 0;                  // Buffer size
+		double sampleRate = 0;               // Sample rate
+		bool resampling = false;             // Eesampling enabled
+		int inputChannels = 0;               // Number of input channels
+		int outputChannels = 0;              // Number of output channels
+		SampleFormat inFormat = None;        // Format used by the callback function for input device
+		SampleFormat outFormat = None;       // Format used by the callback function for output device
+		SampleFormat deviceInFormat = None;  // Format used by the input device
+		SampleFormat deviceOutFormat = None; // Format used by the output device
 
 		StreamInformation& operator=(const StreamParameters& s)
 		{
