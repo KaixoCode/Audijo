@@ -146,7 +146,7 @@ namespace Audijo
 
 	Error WasapiApi::Open(const StreamParameters& settings)
 	{
-		if (m_State != Loaded)
+		if (m_Information.state != Closed)
 			return AlreadyOpen;
 
 		m_Information = settings;
@@ -282,19 +282,19 @@ namespace Audijo
 		// Allocate the user callback buffers
 		AllocateBuffers();
 
-		m_State = Prepared;
+		m_Information.state = Opened;
 		return NoError;
 	}
 
 	Error WasapiApi::Start()
 	{
-		if (m_State == Loaded)
+		if (m_Information.state == Closed)
 			return NotOpen;
 
-		if (m_State == Running)
+		if (m_Information.state == Running)
 			return AlreadyRunning;
 
-		m_State = Running;
+		m_Information.state = Running;
 		m_AudioThread = std::thread{ [this]()
 			{
 				CHECK(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED), "Failed to CoInitialize thread.", return);
@@ -376,7 +376,7 @@ namespace Audijo
 					_tempOutBuff[i] = new char[_bufferSize * (_deviceOutFormat & Bytes)];
 
 				// Start loop
-				while (m_State == Running)
+				while (m_Information.state == Running)
 				{
 					// If not pulled from input buffer
 					if (!_pulled)
@@ -520,13 +520,13 @@ namespace Audijo
 
 	Error WasapiApi::Stop()
 	{
-		if (m_State == Loaded)
+		if (m_Information.state == Closed)
 			return NotOpen;
 
-		if (m_State == Prepared)
+		if (m_Information.state != Running)
 			return NotRunning;
 
-		m_State = Prepared;
+		m_Information.state = Opened;
 		try
 		{
 			m_AudioThread.join();
@@ -540,24 +540,27 @@ namespace Audijo
 
 	Error WasapiApi::Close()
 	{
-		if (m_State == Loaded)
+		if (m_Information.state == Closed)
 			return NotOpen;
 
-		if (m_State == Running)
+		if (m_Information.state == Running)
 			Stop();
 		
+		// Reset information
+		m_Information = StreamInformation{};
+
 		m_InputDevice.Release();  
 		m_OutputDevice.Release(); 
 		m_InputClient.Release();  
 		m_OutputClient.Release(); 
 		m_CaptureClient.Release();
 		m_RenderClient.Release(); 
-		m_State = Loaded;
+		m_Information.state = Closed;
 	};
 
 	Error WasapiApi::SampleRate(double srate)
 	{
-		if (m_State == Loaded)
+		if (m_Information.state == Closed)
 			return NotOpen;
 
 		return Fail;

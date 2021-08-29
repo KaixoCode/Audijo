@@ -351,6 +351,7 @@ namespace Audijo
 				return _error == ASE_NoMemory ? NoMemory : _error == ASE_InvalidMode ? InvalidBufferSize : NotPresent);
 			
 			m_State = Prepared;
+			m_Information.state = Opened;
 
 			// Allocate the user callback buffers
 			AllocateBuffers();
@@ -375,6 +376,7 @@ namespace Audijo
 			return Fail;
 
 		m_State = Running;
+		m_Information.state = StreamState::Running;
 		return NoError;
 	};
 
@@ -389,6 +391,7 @@ namespace Audijo
 		CHECK(ASIOStop(), "Failed to stop the stream.", return Fail);
 
 		m_State = Prepared;
+		m_Information.state = Opened;
 		return NoError;
 	};
 
@@ -403,6 +406,8 @@ namespace Audijo
 		CHECK(ASIODisposeBuffers(), "Failed to dispose buffers", return Fail);
 
 		m_State = Loaded;
+		m_Information = StreamInformation{};
+		m_Information.state = Closed;
 		return NoError;
 	};	
 	
