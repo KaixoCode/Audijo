@@ -18,7 +18,7 @@ set(INCLUDE_DIRS
 
 option(AUDIJO_BUILD_DOCS "Build Docs" OFF)
 option(AUDIJO_BUILD_EXAMPLE "Build Example" ON)
-option(AUDIJO_USE_ASIO "Build ASIO API" ON)
+option(AUDIJO_USE_ASIO "Build ASIO API" OFF)
 option(AUDIJO_USE_WASAPI "Build WASAPI API" ON)
 
 
