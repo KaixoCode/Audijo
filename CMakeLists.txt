@@ -12,7 +12,7 @@ file(GLOB_RECURSE AUDIJO_SOURCE
   "${AUDIJO_SRC}include/*.hpp"
 )
 
-set(INCLUDE_DIRS
+set(AUDIJO_INCLUDE_DIRS
   ${AUDIJO_SRC}include/
 )
 
@@ -22,17 +22,12 @@ option(AUDIJO_USE_ASIO "Build ASIO API" OFF)
 option(AUDIJO_USE_WASAPI "Build WASAPI API" ON)
 
 
-if(AUDIJO_USE_WASAPI)
-add_definitions(-DAUDIJO_WASAPI)
-endif()
-
 if(AUDIJO_USE_ASIO)
-add_definitions(-DAUDIJO_ASIO)
 
 # We require some sdks
 FIND_PACKAGE(ASIOSDK REQUIRED)
 
-list(APPEND INCLUDE_DIRS
+list(APPEND AUDIJO_INCLUDE_DIRS
   ${ASIOSDK_ROOT_DIR}/common/
   ${ASIOSDK_ROOT_DIR}/host/
   ${ASIOSDK_ROOT_DIR}/host/pc/
@@ -48,8 +43,16 @@ endif()
 # Add the library
 add_library(${PRJ_NAME} STATIC ${AUDIJO_SOURCE})
 
+if(AUDIJO_USE_WASAPI)
+target_compile_definitions(${PRJ_NAME} PUBLIC AUDIJO_WASAPI)
+endif()
+
+if(AUDIJO_USE_ASIO)
+target_compile_definitions(${PRJ_NAME} PUBLIC AUDIJO_ASIO)
+endif()
+
 target_include_directories(${PRJ_NAME} PUBLIC
-  ${INCLUDE_DIRS}
+  ${AUDIJO_INCLUDE_DIRS}
 )
 
 target_link_libraries(${PRJ_NAME}
