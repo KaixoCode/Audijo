@@ -73,7 +73,7 @@ namespace Audijo
 				info.channel = i;
 				info.isInput = true;
 				ASIOGetChannelInfo(&info);
-				m_Channels.emplace_back(info.name, info.channelGroup, (bool)info.isActive, true);
+				m_Channels.emplace_back(info.name, info.channelGroup, (bool)info.isActive, true, i);
 			}
 
 			// Load outputs
@@ -83,7 +83,7 @@ namespace Audijo
 				info.channel = i;
 				info.isInput = false;
 				ASIOGetChannelInfo(&info);
-				m_Channels.emplace_back(info.name, info.channelGroup, (bool)info.isActive, false);
+				m_Channels.emplace_back(info.name, info.channelGroup, (bool)info.isActive, false, i);
 			}
 
 			// Remove current driver if it's not the opened one
@@ -103,7 +103,7 @@ namespace Audijo
 	AsioApi::AsioApi()
 		: ApiBase()
 	{   // Load devices
-		Devices();
+		Devices(true);
 	}
 
 	AsioApi::~AsioApi()
@@ -111,10 +111,10 @@ namespace Audijo
 		Close();
 	}
 
-	const std::vector<DeviceInfo<Asio>>& AsioApi::Devices()
+	const std::vector<DeviceInfo<Asio>>& AsioApi::Devices(bool reload)
 	{
 		// Can't probe new info when a stream has been opened
-		if (m_State != Loaded)
+		if (m_State != Loaded || !reload)
 			return m_Devices;
 
 		// Make a list of all numbers from 0 to amount of current devices

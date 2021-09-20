@@ -206,7 +206,7 @@ namespace Audijo
 		 * Search for all available devices. When called more than once, the list will be updated.
 		 * @return all available devices given the chosen api.
 		 */
-		const std::vector<DeviceInfo<Wasapi>>& Devices() const { return ((WasapiApi*)m_Api.get())->Devices(); }
+		const std::vector<DeviceInfo<Wasapi>>& Devices(bool reload = false) const { return ((WasapiApi*)m_Api.get())->Devices(reload); }
 
 		/**
 		 * Returns device with the given id.
@@ -247,7 +247,7 @@ namespace Audijo
 		 * Search for all available devices. When called more than once, the list will be updated.
 		 * @return all available devices given the chosen api.
 		 */
-		const std::vector<DeviceInfo<Asio>>& Devices() const { return ((AsioApi*)m_Api.get())->Devices(); }
+		const std::vector<DeviceInfo<Asio>>& Devices(bool reload = false) const { return ((AsioApi*)m_Api.get())->Devices(reload); }
 
 		/**
 		 * Returns device with the given id.

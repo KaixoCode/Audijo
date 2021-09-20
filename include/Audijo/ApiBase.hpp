@@ -56,6 +56,11 @@ namespace Audijo
 		 * Channel is input
 		 */
 		bool input;
+
+		/**
+		 * Channel id
+		 */
+		int id;
 	};
 
 	template<Api api = Unspecified>

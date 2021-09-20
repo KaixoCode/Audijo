@@ -21,11 +21,14 @@ namespace Audijo
 			(void**)&m_DeviceEnumerator);
 
 		// Load devices once at the start
-		Devices();
+		Devices(true);
 	}
 
-	const std::vector<DeviceInfo<Wasapi>>& WasapiApi::Devices()
+	const std::vector<DeviceInfo<Wasapi>>& WasapiApi::Devices(bool reload)
 	{
+		if (!reload)
+			return m_Devices;
+
 		// Make a list of all numbers from 0 to amount of current devices
 		// this is used to determine if we need to delete devices from the list after querying.
 		std::vector<int> _toDelete;

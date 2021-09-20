@@ -62,7 +62,7 @@ namespace Audijo
 		WasapiApi();
 		~WasapiApi() { Close(); }
 
-		const std::vector<DeviceInfo<Wasapi>>& Devices();
+		const std::vector<DeviceInfo<Wasapi>>& Devices(bool reload = false);
 		const DeviceInfo<>& Device(int id) const override { for (auto& i : m_Devices) if (i.id == id) return (DeviceInfo<>&)i; };
 		int DeviceCount() const override { return m_Devices.size(); };
 		const DeviceInfo<Wasapi>& ApiDevice(int id) const { for (auto& i : m_Devices) if (i.id == id) return i; };
