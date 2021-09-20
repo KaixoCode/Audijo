@@ -33,7 +33,7 @@ list(APPEND AUDIJO_INCLUDE_DIRS
   ${ASIOSDK_ROOT_DIR}/host/pc/
 )
 
-list(APPEND SOURCE
+list(APPEND AUDIJO_SOURCE
   ${ASIOSDK_ROOT_DIR}/common/asio.cpp
   ${ASIOSDK_ROOT_DIR}/host/asiodrivers.cpp
   ${ASIOSDK_ROOT_DIR}/host/pc/asiolist.cpp
