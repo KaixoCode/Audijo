@@ -52,6 +52,7 @@ namespace Audijo
 			for (int i = 0; i < _nInChannels; i++)
 				delete[] m_InputBuffers[i];
 			delete[] m_InputBuffers;
+			m_InputBuffers = nullptr;
 		}
 
 		if (m_OutputBuffers != nullptr)
@@ -60,6 +61,7 @@ namespace Audijo
 			for (int i = 0; i < _nOutChannels; i++)
 				delete[] m_OutputBuffers[i];
 			delete[] m_OutputBuffers;
+			m_OutputBuffers = nullptr;
 		}
 	}
 
