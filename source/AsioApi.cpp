@@ -37,7 +37,7 @@ extern IASIO* theAsioDriver;
 
 namespace Audijo
 {
-#define CHECK(x, msg, type) if (auto _error = x) { LOGL(msg << " (" << getAsioErrorString(_error) << ")"); type; }
+#define CHECK(x, msg, type) if (auto _error = x) { LOGL(msg << "(" << getAsioErrorString(_error) << ")"); type; }
 	/*
 	 * API Specific DeviceInfo object
 	 */
@@ -235,7 +235,12 @@ namespace Audijo
 
 		// Open the driver
 		{
-			drivers.asioOpenDriver(_deviceId, (void**)&theAsioDriver);
+			drivers.removeCurrentDriver();
+			if (_deviceId >= 0 && _deviceId < m_Devices.size())
+				drivers.loadDriver(m_Devices[_deviceId].name.data());
+
+			else
+				return NotPresent;
 
 			// Init the ASIO
 			driverInfo.asioVersion = 2;
@@ -402,8 +407,9 @@ namespace Audijo
 
 		if (m_State == Running)
 			CHECK(ASIOStop(), "Failed to stop the stream.", return Fail);
-
-		CHECK(ASIODisposeBuffers(), "Failed to dispose buffers", return Fail);
+		
+		drivers.removeCurrentDriver();
+		theAsioDriver = nullptr;
 
 		m_State = Loaded;
 		m_Information = StreamInformation{};
