@@ -508,7 +508,7 @@ namespace Audijo
 			char* _temp = (char*)m_BufferInfos[i].buffers[doubleBufferIndex];
 			if (_inSwap)
 				m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _deviceInFormat);
-			m_AsioApi->ConvertBuffer(_inputs[i], _temp, _bufferSize, _deviceInFormat, _inFormat);
+			m_AsioApi->ConvertBuffer(_inputs[i], _temp, _bufferSize, _inFormat, _deviceInFormat);
 		}
 
 		// usercallback
