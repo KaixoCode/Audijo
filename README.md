@@ -1,9 +1,5 @@
 # Audijo
-
-**It is in beta!**
-Help me test this badboi, I can't really test all edge cases since I myself only have 2 ASIO devices. So if you find any bugs or crashes lemme know. If you want to use ASIO you're going to have to download the asio sdk and put the asio folder in the folder <code>./sdk</code>.
-
-It requires C++20!
+Very simple modern C++ audio library with Wasapi and ASIO support. Requires C++20.
 
 Documentation: https://code.kaixo.me/Audijo/
 
