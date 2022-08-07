@@ -519,7 +519,7 @@ namespace Audijo
 		// Convert the output buffer
 		for (int i = 0; i < _nOutChannels; i++)
 		{
-			char* _temp = (char*)m_BufferInfos[i + _nOutChannels].buffers[doubleBufferIndex];
+			char* _temp = (char*)m_BufferInfos[i + _nInChannels].buffers[doubleBufferIndex];
 			m_AsioApi->ConvertBuffer(_temp, _outputs[i], _bufferSize, _deviceOutFormat, _outFormat);
 			if (_outSwap)
 				m_AsioApi->ByteSwapBuffer(_temp, _bufferSize, _deviceOutFormat);
