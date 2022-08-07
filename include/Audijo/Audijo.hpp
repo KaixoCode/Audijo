@@ -146,7 +146,7 @@ namespace Audijo
 		 * Fail - If changing the sample rate at this time is not supported, or general fail.
 		 * NoError - If sample rate successfully changed
 		 */
-		Error SetSampleRate(double srate) { return !m_Api ? NoApi : m_Api->SetSampleRate(srate); };
+		Error SetSampleRate(double srate) { return !m_Api ? NoApi : m_Api->SampleRate(srate); };
 
 		/**
 		 * Get this Stream object as a specific api, to expose api specific functions.
@@ -255,7 +255,7 @@ namespace Audijo
 		 * @return device with id
 		 */
 		const DeviceInfo<Asio>& Device(int id) const { return ((AsioApi*)m_Api.get())->ApiDevice(id); }
-	
+
 		virtual Audijo::Api Api() const override { return Asio; };
 	};
 #endif
