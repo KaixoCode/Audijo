@@ -165,6 +165,8 @@ namespace Audijo
 		Iterator begin() { return Iterator{ Frame{ *this, 0 } }; }
 		Iterator end() { return Iterator{ Frame{ *this, Frames() } }; }
 
+		Type** data() { return m_Buffer; }
+
 	private:
 		Type** m_Buffer;
 		int m_ChannelCount;
