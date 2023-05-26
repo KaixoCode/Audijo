@@ -218,11 +218,14 @@ namespace Audijo
 				m_Information.input = m_Information.output = 0;
 		}
 
+		auto _device = DeviceById(m_Information.input);
+		if (_device == nullptr) return NotPresent;
+
 		// Set default channel count
 		{
 			// If nmr of channels is not set, set it to max
-			m_Information.inputChannels = m_Devices[m_Information.input].inputChannels;
-			m_Information.outputChannels = m_Devices[m_Information.output].outputChannels;
+			m_Information.inputChannels = _device->inputChannels;
+			m_Information.outputChannels = _device->outputChannels;
 		}
 
 		// Retrieve necessary settings;
@@ -237,7 +240,7 @@ namespace Audijo
 		{
 			drivers.removeCurrentDriver();
 			if (_deviceId >= 0 && _deviceId < m_Devices.size())
-				drivers.loadDriver(m_Devices[_deviceId].name.data());
+				drivers.loadDriver(_device->name.data());
 
 			else
 				return NotPresent;
@@ -435,6 +438,13 @@ namespace Audijo
 
 		CHECK(ASIOControlPanel(), "Failed to open control panel", return Fail);
 		return NoError;
+	}
+
+	DeviceInfo<Asio>* AsioApi::DeviceById(int id) {
+		for (auto& device : m_Devices) {
+			if (device.id == id) return &device;
+		}
+		return nullptr;
 	}
 
 	void AsioApi::SampleRateDidChange(ASIOSampleRate sRate)

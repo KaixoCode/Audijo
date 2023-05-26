@@ -56,6 +56,8 @@ namespace Audijo
 	protected:
 		std::vector<DeviceInfo<Asio>> m_Devices;
 
+		DeviceInfo<Asio>* DeviceById(int id);
+
 		static void SampleRateDidChange(ASIOSampleRate);
 		static long AsioMessage(long, long, void*, double*);
 		static ASIOTime* BufferSwitchTimeInfo(ASIOTime*, long, ASIOBool);
