@@ -141,7 +141,7 @@ namespace Audijo
 			CHECK(ASIOInit(&driverInfo), "Failed to load device " << _name, continue);
 
 			// Get channel counts
-			long _in, _out;
+			long _in = 0, _out = 0;
 			CHECK(ASIOGetChannels(&_in, &_out), "Failed to load device " << _name, drivers.removeCurrentDriver(); continue);
 
 			// Determine samplerates
