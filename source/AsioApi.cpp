@@ -239,11 +239,7 @@ namespace Audijo
 		// Open the driver
 		{
 			drivers.removeCurrentDriver();
-			if (_deviceId >= 0 && _deviceId < m_Devices.size())
-				drivers.loadDriver(_device->name.data());
-
-			else
-				return NotPresent;
+			drivers.loadDriver(_device->name.data());
 
 			// Init the ASIO
 			driverInfo.asioVersion = 2;
