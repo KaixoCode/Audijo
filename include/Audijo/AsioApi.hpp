@@ -36,7 +36,7 @@ namespace Audijo
 	{
 		enum State { Loaded, Initialized, Prepared, Running, Reset };
 	public:
-		AsioApi();
+		AsioApi(bool loadDevices = true);
 		~AsioApi();
 		
 		const std::vector<DeviceInfo<Asio>>& Devices(bool reload = false);

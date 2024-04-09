@@ -6,7 +6,7 @@ namespace Audijo
 {
 #define CHECK(x, msg, type) if (FAILED(x)) { LOGL(msg); type; }
 
-	WasapiApi::WasapiApi()
+	WasapiApi::WasapiApi(bool loadDevices)
 		: ApiBase()
 	{
 		// WASAPI can run either apartment or multi-threaded
@@ -20,8 +20,10 @@ namespace Audijo
 			CLSCTX_ALL, __uuidof(IMMDeviceEnumerator),
 			(void**)&m_DeviceEnumerator);
 
-		// Load devices once at the start
-		Devices(true);
+		if (loadDevices) {
+			// Load devices once at the start
+			Devices(true);
+		}
 	}
 
 	const std::vector<DeviceInfo<Wasapi>>& WasapiApi::Devices(bool reload)

@@ -18,9 +18,9 @@ namespace Audijo
 		 * Constructor
 		 * @param api Api
 		 */
-		Stream(Api api)
+		Stream(Api api, bool loadDevices = true)
 		{
-			Api(api);
+			Api(api, loadDevices);
 		}
 
 		/**
@@ -159,16 +159,16 @@ namespace Audijo
 		 * Set the api.
 		 * @param api api
 		 */
-		virtual void Api(Api api)
+		virtual void Api(Api api, bool loadDevices = true)
 		{
 			m_Type = api;
 			switch (api)
 			{
 #ifdef AUDIJO_ASIO
-			case Asio: m_Api = std::make_unique<AsioApi>(); break;
+			case Asio: m_Api = std::make_unique<AsioApi>(loadDevices); break;
 #endif
 #ifdef AUDIJO_WASAPI
-			case Wasapi: m_Api = std::make_unique<WasapiApi>(); break;
+			case Wasapi: m_Api = std::make_unique<WasapiApi>(loadDevices); break;
 #endif
 			default: throw std::exception("Incompatible api");
 			}
@@ -194,12 +194,12 @@ namespace Audijo
 	class Stream<Wasapi> : public Stream<>
 	{
 		// Delete methods
-		void Api(Audijo::Api api) override {};
+		void Api(Audijo::Api api, bool loadDevices = true) override {};
 		using Stream<>::Get;
 
 	public:
-		Stream()
-			: Stream<>(Wasapi)
+		Stream(bool loadDevices = true)
+			: Stream<>(Wasapi, loadDevices)
 		{}
 
 		/**
@@ -228,11 +228,11 @@ namespace Audijo
 	class Stream<Asio> : public Stream<>
 	{
 		// Delete the api method
-		void Api(Audijo::Api api) override {};
+		void Api(Audijo::Api api, bool loadDevices = true) override {};
 	
 	public:
-		Stream()
-			: Stream<>(Asio)
+		Stream(bool loadDevices = true)
+			: Stream<>(Asio, loadDevices)
 		{}
 
 		/**

@@ -59,7 +59,7 @@ namespace Audijo
 		};
 
 	public:
-		WasapiApi();
+		WasapiApi(bool loadDevices = true);
 		~WasapiApi() { Close(); }
 
 		const std::vector<DeviceInfo<Wasapi>>& Devices(bool reload = false);

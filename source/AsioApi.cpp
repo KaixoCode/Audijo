@@ -100,10 +100,13 @@ namespace Audijo
 	 * API
 	 */
 
-	AsioApi::AsioApi()
+	AsioApi::AsioApi(bool loadDevices)
 		: ApiBase()
-	{   // Load devices
-		Devices(true);
+	{   
+		if (loadDevices) {
+			// Load devices
+			Devices(true);
+		}
 	}
 
 	AsioApi::~AsioApi()
