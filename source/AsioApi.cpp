@@ -195,7 +195,7 @@ namespace Audijo
 	{
 		// The ASIO state is global, since ASIO only allows a single driver to be opened per program,
 		// so if the state is not 'Loaded' we can't open another stream.
-		if (m_State != Loaded)
+		if (m_State == Prepared || m_State == Running)
 			return AlreadyOpen;
 
 		// Make sure to free buffers first
