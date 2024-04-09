@@ -144,6 +144,10 @@ namespace Audijo
 			long _in = 0, _out = 0;
 			CHECK(ASIOGetChannels(&_in, &_out), "Failed to load device " << _name, drivers.removeCurrentDriver(); continue);
 
+			// More than 512 channels? Just assume it's a bug and set it to 0
+			if (_in > 512) _in = 0;
+			if (_out > 512) _out = 0;
+
 			// Determine samplerates
 			std::vector<double> _srates;
 			for (auto& _srate : m_SampleRates)
