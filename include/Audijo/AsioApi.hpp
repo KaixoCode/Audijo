@@ -50,6 +50,7 @@ namespace Audijo
 		Error Close() override;
 
 		Error SampleRate(double) override;
+		Error BufferSize(std::size_t) override;
 
 		Error OpenControlPanel();
 

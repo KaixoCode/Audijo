@@ -147,6 +147,18 @@ namespace Audijo
 		 * NoError - If sample rate successfully changed
 		 */
 		Error SetSampleRate(double srate) { return !m_Api ? NoApi : m_Api->SampleRate(srate); };
+		
+		/**
+		 * Set the sample rate of the stream.
+		 * @param srate sample rate
+		 * @return
+		 * NotOpen - If no device is open.
+		 * NoApi - If no Api was specified<br>
+		 * InvalidBufferSize - If the buffer size is not supported
+		 * Fail - If changing the buffer size at this time is not supported, or general fail.
+		 * NoError - If sample rate successfully changed
+		 */
+		Error SetBufferSize(std::size_t size) { return !m_Api ? NoApi : m_Api->BufferSize(size); };
 
 		/**
 		 * Get this Stream object as a specific api, to expose api specific functions.

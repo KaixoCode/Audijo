@@ -207,6 +207,7 @@ namespace Audijo
 		virtual Error Close() = 0;
 
 		virtual Error SampleRate(double) = 0;
+		virtual Error BufferSize(std::size_t) { return Fail; /* Not supported */ };
 
 		void Callback(std::unique_ptr<CallbackWrapperBase>&& callback) { m_Callback = std::move(callback); }
 

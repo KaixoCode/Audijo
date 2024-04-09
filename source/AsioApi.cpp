@@ -434,6 +434,36 @@ namespace Audijo
 		return NoError;
 	};
 
+	Error AsioApi::BufferSize(std::size_t size)
+	{
+		if (m_State == Loaded)
+			return NotOpen;
+
+		auto _pastState = m_State;
+
+		// Create the buffers
+		auto _nChannels = m_Information.inputChannels + m_Information.outputChannels;
+		auto _bufferSize = size;
+		m_State = Loaded;
+		ASIODisposeBuffers();
+		CHECK(ASIOCreateBuffers(m_BufferInfos, _nChannels, _bufferSize, &m_Callbacks), "Failed to create ASIO buffers: ",
+			return _error == ASE_NoMemory ? NoMemory : _error == ASE_InvalidMode ? InvalidBufferSize : NotPresent);
+		m_State = Prepared;
+		m_Information.bufferSize = _bufferSize;
+		FreeBuffers();
+		AllocateBuffers();
+
+		if (_pastState == Running) {
+			auto error = ASIOStart();
+			if (error != ASE_OK)
+				return Fail;
+
+			m_State = Running;
+		}
+
+		return NoError;
+	};
+
 	Error AsioApi::OpenControlPanel()
 	{ 
 		if (m_State == Loaded)
