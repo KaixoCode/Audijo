@@ -89,7 +89,7 @@ namespace Audijo
 			Buffer& m_Buffer;
 			int m_Index;
 
-			friend class Buffer<Type>::Iterator;
+			friend struct Buffer<Type>::Iterator;
 		};
 
 		/**
@@ -172,7 +172,7 @@ namespace Audijo
 		int m_ChannelCount;
 		int m_Size;
 
-		friend class Buffer<Type>::Frame;
+		friend struct Buffer<Type>::Frame;
 		template<typename T1, typename T2> friend class Parallel;
 	};
 

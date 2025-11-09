@@ -43,7 +43,7 @@ namespace Audijo
 		auto Front() { return m_Buffer[m_Head]; }
 		bool IsEmpty() { return m_Count == 0; }
 		bool IsFull() { return m_Count == m_MaxSize; }
-		int Space() { return m_MaxSize - m_Count - 1; }
+		size_t Space() { return m_MaxSize - m_Count - 1; }
 		size_t Size() { return m_Count; }
 	};
 }

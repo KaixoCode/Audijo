@@ -33,15 +33,15 @@ namespace Audijo
 
 		// Make a list of all numbers from 0 to amount of current devices
 		// this is used to determine if we need to delete devices from the list after querying.
-		std::vector<int> _toDelete;
-		for (int i = m_Devices.size() - 1; i >= 0; i--)
+		std::vector<uint64_t> _toDelete;
+		for (uint64_t i = m_Devices.size(); i-- > 0;)
 			_toDelete.push_back(i);
 
 		// Get default devices
 		Pointer<IMMDevice> _defaultIn;
 		Pointer<IMMDevice> _defaultOut;
-		CHECK(m_DeviceEnumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &_defaultIn), "Unable to retrieve the default input device");
-		CHECK(m_DeviceEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &_defaultOut), "Unable to retrieve the default output device");
+		CHECK(m_DeviceEnumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &_defaultIn), "Unable to retrieve the default input device", return m_Devices);
+		CHECK(m_DeviceEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &_defaultOut), "Unable to retrieve the default output device", return m_Devices);
 
 		// Open the property store of the device to retrieve the name
 		Pointer<IPropertyStore> _defaultInPropertyStore;
@@ -58,19 +58,19 @@ namespace Audijo
 		PropVariantInit(_defaultOutDeviceNameProp);
 		CHECK(_defaultInPropertyStore->GetValue(PKEY_Device_FriendlyName, _defaultInDeviceNameProp), "Unable to retrieve default device name.", return m_Devices);
 		CHECK(_defaultOutPropertyStore->GetValue(PKEY_Device_FriendlyName, _defaultOutDeviceNameProp), "Unable to retrieve default device name.", return m_Devices);
-		wcstombs(_defaultInNameArr, _defaultInDeviceNameProp->pwszVal, 64); // Copy the wstring to the char array
-		wcstombs(_defaultOutNameArr, _defaultOutDeviceNameProp->pwszVal, 64); // Copy the wstring to the char array
+		errno_t errCode = 	wcstombs_s(nullptr, _defaultInNameArr, sizeof(_defaultInNameArr), _defaultInDeviceNameProp->pwszVal, sizeof(_defaultInNameArr)); // Copy the wstring to the char array
+		errCode = 			wcstombs_s(nullptr, _defaultOutNameArr, sizeof(_defaultOutNameArr), _defaultOutDeviceNameProp->pwszVal, sizeof(_defaultOutNameArr)); // Copy the wstring to the char array
 		std::string _defaultInName = _defaultInNameArr;
 		std::string _defaultOutName = _defaultOutNameArr;
 
 		// Count devices
-		unsigned int _count = 0;
+		uint32_t _count = 0;
 		m_WasapiDevices.Release();
 		CHECK(m_DeviceEnumerator->EnumAudioEndpoints(eAll, DEVICE_STATE_ACTIVE, &m_WasapiDevices), "Unable to retrieve device collection.", return m_Devices);
 		CHECK(m_WasapiDevices->GetCount(&_count), "Unable to retrieve device count.", return m_Devices);
 		
 		// Go through all devices
-		for (int i = 0; i < _count; i++)
+		for (uint32_t i = 0; i < _count; i++)
 		{
 			// First get the device from the device collection
 			Pointer<IMMDevice> _dev;
@@ -85,7 +85,8 @@ namespace Audijo
 			Pointer<PROPVARIANT> _deviceNameProp = new PROPVARIANT;
 			PropVariantInit(_deviceNameProp);
 			CHECK(_propertyStore->GetValue(PKEY_Device_FriendlyName, _deviceNameProp), "Unable to retrieve device name.", continue);
-			wcstombs(_nameArr, _deviceNameProp->pwszVal, 64); // Copy the wstring to the char array
+			const size_t nameArrSize = sizeof(_nameArr);
+			errCode = wcstombs_s(nullptr, _nameArr, nameArrSize, _deviceNameProp->pwszVal, nameArrSize); // Copy the wstring to the char array
 			std::string _name = _nameArr;
 
 			// Get the audio client from the device
@@ -119,7 +120,7 @@ namespace Audijo
 
 			// Edit an existing device, or if doesn't exist, just add new device.
 			bool _found = false;
-			int _index = 0;
+			uint64_t _index = 0;
 			for (auto& _device : m_Devices)
 			{
 				if (_device.name == _name && _device.id == i)
@@ -139,7 +140,7 @@ namespace Audijo
 			}
 
 			if (!_found)
-				m_Devices.push_back(DeviceInfo<Wasapi>{ { i, _name, _in, _out, _srates, _default, Wasapi } });
+				m_Devices.push_back(DeviceInfo<Wasapi>{ { (int) i, _name, _in, _out, _srates, _default, Wasapi } });
 		}
 
 		// Delete all devices we couldn't find again.
@@ -181,7 +182,7 @@ namespace Audijo
 		int _nOutChannels = m_Information.outputChannels;
 		int _nChannels = _nInChannels + _nOutChannels;
 		int _bufferSize = m_Information.bufferSize;
-		int _sampleRate = m_Information.sampleRate;
+		int _sampleRate = (int) m_Information.sampleRate;
 
 		if (_inDeviceId != NoDevice)
 		{
@@ -390,7 +391,7 @@ namespace Audijo
 						if (m_InputClient)
 						{
 							// Only pull if the ring buffer contains enough samples to fill the user buffer
-							if (_inRingBuffer.Size() >= _bufferSize * _nInChannels * (_deviceInFormat & Bytes))
+							if (_inRingBuffer.Size() >= static_cast<unsigned long long>(_bufferSize) * _nInChannels * (_deviceInFormat & Bytes))
 							{
 								// Get samples from ring buffer
 								for (int i = 0; i < _bufferSize; i++)
@@ -419,7 +420,7 @@ namespace Audijo
 					// If we've pull, it means the callback was called, so we need to handle the user output buffer
 					if (m_OutputClient && _pulled)
 					{
-						if (_outRingBuffer.Space() >= _bufferSize * _nOutChannels * (_deviceOutFormat & Bytes))
+						if (_outRingBuffer.Space() >= static_cast<unsigned long long>(_bufferSize) * _nOutChannels * (_deviceOutFormat & Bytes))
 						{
 							// First convert to the right format
 							for (int j = 0; j < _nOutChannels; j++)
@@ -461,10 +462,10 @@ namespace Audijo
 						CHECK(m_CaptureClient->GetBuffer(&_streamBuffer, &_inputFramesAvailable, &_flags, nullptr, nullptr), "Failed to retrieve input buffer.", goto Cleanup);
 
 						// If there is enough space in the input ring buffer, we'll enqueue it.
-						if (_inRingBuffer.Space() >= _inputFramesAvailable * _nInChannels * (_deviceInFormat & Bytes))
+						if (_inRingBuffer.Space() >= static_cast<unsigned long long>(_inputFramesAvailable) * _nInChannels * (_deviceInFormat & Bytes))
 						{
 							// Add the input data to the input ring buffer
-							for (int i = 0; i < _inputFramesAvailable * _nInChannels * (_deviceInFormat & Bytes); i++)
+							for (uint32_t i = 0; i < _inputFramesAvailable * _nInChannels * (_deviceInFormat & Bytes); i++)
 								_inRingBuffer.Enqueue(_streamBuffer[i]);
 
 							CHECK(m_CaptureClient->ReleaseBuffer(_inputFramesAvailable), "Unable to release capture buffer", goto Cleanup);
@@ -484,13 +485,13 @@ namespace Audijo
 						_outputFramesAvailable -= _framePadding;
 
 						// If we have enough data to write to the device from the output ring buffer
-						if (_outputFramesAvailable != 0 && _outRingBuffer.Size() >= _outputFramesAvailable * _nOutChannels * (_deviceOutFormat & Bytes))
+						if (_outputFramesAvailable != 0 && _outRingBuffer.Size() >= static_cast<unsigned long long>(_outputFramesAvailable) * _nOutChannels * (_deviceOutFormat & Bytes))
 						{
 							// Get the buffer
 							CHECK(m_RenderClient->GetBuffer(_outputFramesAvailable, &_streamBuffer), "Failed to retrieve output buffer.", goto Cleanup);
 
 							// Put data in the output device buffer
-							for (int i = 0; i < _outputFramesAvailable * _nOutChannels * (_deviceOutFormat & Bytes); i++)
+							for (uint32_t i = 0; i < _outputFramesAvailable * _nOutChannels * (_deviceOutFormat & Bytes); i++)
 								_streamBuffer[i] = _outRingBuffer.Dequeue();
 							
 							CHECK(m_RenderClient->ReleaseBuffer(_outputFramesAvailable, 0), "Unable to release capture buffer", goto Cleanup);
@@ -561,6 +562,8 @@ namespace Audijo
 		m_CaptureClient.Release();
 		m_RenderClient.Release(); 
 		m_Information.state = Closed;
+
+		return Error::NoError;
 	};
 
 	Error WasapiApi::SampleRate(double srate)
